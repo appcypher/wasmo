@@ -1,4 +1,4 @@
-### JIT MODE
+### LAZY MODE
 
 - Single-pass compilation only (https://v8.dev/blog/liftoff)
 - Set up execution context
@@ -20,17 +20,22 @@
     - Using metadata gotten from first linear pass.
     - Speculatively compile next function call (if not already compiled) on as separate core.
 
-### AOT MODE
+### EAGER MODE
 
 - Single-pass compilation only (https://v8.dev/blog/liftoff)
 - Compile everything to a single llvm module.
-- Compile llvm module to executable native code (as a shared library).
+- Serialize wasm module.
 - Write to file.
 
-### AOT EXECUTION MODE
 
-- Set up execution context
-    - Memory, Tables
-    - Imports
-- Load shared library
-- Run entry function.
+### PROPOSED API
+
+```rs
+let imports = Imports::default(/* memories, tables, globals, functions */)?;
+let module = Module::new(&bytes, CompileMode::Eager)?; // Compiles with unresolved symbols. Creates trampolines.
+let instance = Instance::new(&module, &imports)?; // Links memory pieces. Makes imported functions where accessible.
+```
+
+```rs
+module.dump(); // Dumps serialized module to Vec<u8> or &[u8].
+```
