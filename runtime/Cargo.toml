@@ -1,0 +1,16 @@
+[package]
+name = "wasmo_runtime"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+utilities = { path = "../../utilities" }
+wasmparser = "0.82.0"
+rkyv = "0.7.31"
+bytecheck = "0.6.7"
+llvm-sys = "130"
+
+[lib]
+path = "lib/lib.rs"

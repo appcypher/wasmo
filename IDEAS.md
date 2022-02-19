@@ -1,3 +1,7 @@
+### GOALS
+
+- The module must to be portable. Can be moved across threads but not necessarily shareable across threads.
+
 ### LAZY MODE
 
 - Single-pass compilation only (https://v8.dev/blog/liftoff)
@@ -32,10 +36,61 @@
 
 ```rs
 let imports = Imports::default(/* memories, tables, globals, functions */)?;
-let module = Module::new(&bytes, CompileMode::Eager)?; // Compiles with unresolved symbols. Creates trampolines.
+let module = Module::new(&bytes, opts)?; // Compiles with unresolved symbols. Creates trampolines.
 let instance = Instance::new(&module, &imports)?; // Links memory pieces. Makes imported functions where accessible.
 ```
 
 ```rs
 module.dump(); // Dumps serialized module to Vec<u8> or &[u8].
+```
+
+```rs
+module.clone(); // Cloning module
+```
+
+Module has to be Send and Sync
+
+https://webassembly.github.io/spec/core/appendix/embedding.html
+
+Using ORCJIT.
+- Potential for Profile Guided Optimization.
+- Dump ObjectFile to disk
+- Load Object File.
+
+```
+Store {
+    init() -> { funcs, mems, globals, tables }
+}
+
+Module {
+    decode(Vec<u8>) -> Module? // wasm binary
+    parse(String) -> Module? // wat text
+    validate(&self) -> ()?
+    instantiate() => (Store, Instance?)
+    imports() -> Vec<(String, String, ExternType)>
+    exports() -> Vec<(String, ExternType)>
+}
+
+Instance {
+    export(Module, String) -> (String, ExternType)
+}
+
+Function {
+    alloc(Store, FuncType, HostFunc) -> (Store, FuncAddr)
+    type(Store, FuncAddr) -> FuncType
+    invoke(Store, FuncAddr, Vec<Value>) -> (Store, Vec<Value>)
+}
+
+Table {
+    alloc(Store, FuncType, Ref) -> (Store, TableAddr)
+    ...
+}
+
+Memory {
+    ...
+}
+
+Global {
+    ...
+}
 ```
