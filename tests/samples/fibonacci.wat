@@ -1,8 +1,10 @@
 (module
     (memory $mem 1 10)
 
+    (table $table 1 10 funcref)
+
     (func $_start (result i32)
-        (call $fibonacci (i32.const 1))
+        (call $fibonacci (i32.const 10))
     )
 
     (func $dummy_func (result i32)
@@ -36,8 +38,10 @@
         )
     )
 
-    ;; Dummy data
-    (data $dummy_data (i32.const 4) "\00\01\02\03")
+    ;; init.
+    (data $data (memory $mem) (offset (i32.const 0)) "\00\01\02\03")
+
+    (elem $elem (table $table) (offset (i32.const 0)) funcref (item (i32.const 0)))
 
     (export "_start" (func $_start))
 )

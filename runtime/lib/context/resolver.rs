@@ -6,10 +6,4 @@ use rkyv::{Archive, Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize, Archive, Default)]
 #[archive(compare(PartialEq))]
 #[archive_attr(derive(CheckBytes, Debug))]
-pub struct LLVM {}
-
-impl LLVM {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
+pub struct CompileTimeResolver {} // TODO(appcypher)

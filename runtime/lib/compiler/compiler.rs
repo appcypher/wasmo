@@ -1,18 +1,35 @@
 // Copyright 2022 the Gigamono authors. All rights reserved. GPL-3.0 License.
 
+use bytecheck::CheckBytes;
+use rkyv::{Archive, Deserialize, Serialize};
 use utilities::result::Result;
-use wasmparser::{Parser, Payload};
+use wasmparser::{Parser, Payload, TypeDef, TypeSectionReader};
 
-use super::llvm::LLVM;
+use crate::{
+    context::CompileTimeResolver, errors::CompilerError, store::Function, types::FuncType,
+};
 
+use super::{llvm::LLVM, utils::convert, value::Value};
+
+#[derive(Debug, Serialize, Deserialize, Archive, Default)]
+#[archive(compare(PartialEq))]
+#[archive_attr(derive(CheckBytes, Debug))]
 pub struct Compiler {
     pub llvm: Option<LLVM>,
+    pub resolver: CompileTimeResolver,
     pub liftoff: bool,
+    pub types: Vec<FuncType>,
+    pub functions: Vec<Function>,
+    pub current_frame: Option<FunctionFrame>,
+    // ...
 }
 
-pub struct ConceptualStack {
-    pub stack: Vec<u8>,
-    pub stack_pointer: usize,
+#[derive(Debug, Serialize, Deserialize, Archive, Default)]
+#[archive(compare(PartialEq))]
+#[archive_attr(derive(CheckBytes, Debug))]
+pub struct FunctionFrame {
+    pub locals: Vec<Value>,
+    pub stack: Vec<Value>,
 }
 
 impl Compiler {
@@ -20,26 +37,19 @@ impl Compiler {
     pub fn new(liftoff: bool) -> Self {
         Self {
             liftoff,
-            llvm: None,
+            ..Default::default()
         }
     }
 
     /// Compiles the given wasm bytes.
-    pub fn compile(&self, wasm: &[u8]) -> Result<()> {
-        let mut llvm = LLVM::new();
+    pub fn compile(&mut self, wasm: &[u8]) -> Result<()> {
+        let mut _llvm = LLVM::new();
 
         for payload in Parser::new(0).parse_all(wasm) {
             match payload? {
-                Payload::Version { num, range } => {
-                    println!("======= Version =======");
-                    println!("version: {}", num);
-                    println!("range: {:?}", range);
-                }
+                Payload::Version { .. } => (),
                 Payload::TypeSection(reader) => {
-                    println!("======= TypeSection =======");
-                    reader.into_iter().for_each(|i| {
-                        println!("type reference: {:?}", i);
-                    });
+                    self.register_func_types(reader)?;
                 }
                 Payload::ImportSection(reader) => {
                     println!("======= ImportSection =======");
@@ -176,6 +186,22 @@ impl Compiler {
                 }
             }
         }
+
+        Ok(())
+    }
+
+    /// Registers function type in type section.
+    pub fn register_func_types(&mut self, reader: TypeSectionReader) -> Result<()> {
+        for result in reader.into_iter() {
+            match result? {
+                TypeDef::Func(ty) => {
+                    self.types.push(convert::to_wasmo_functype(&ty)?);
+                }
+                TypeDef::Instance(_) => return Err(CompilerError::UnsupportedInstanceType.into()),
+                TypeDef::Module(_) => return Err(CompilerError::UnsupportedModuleType.into()),
+            };
+        }
+
         Ok(())
     }
 }

@@ -2,5 +2,7 @@
 
 mod compiler;
 mod llvm;
+mod value;
+mod utils;
 
 pub use compiler::*;

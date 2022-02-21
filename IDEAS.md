@@ -1,8 +1,13 @@
 ### GOALS
 
-1. Fast single-pass mode.
-2. Progressive optimisation.
-3. Cacheable.
+In this order.
+
+1. Simple implementation.
+2. Single-pass compilation.
+3. Serializable.
+4. Progressive optimisation.
+
+##
 
 ### MODES
 
@@ -17,6 +22,8 @@ The lift-off mode compiles the wasm binary multiple times, progressively generat
 We are using OrcV2 because it promises concurrent compilation and makes JITing a lot easier with support for loading and dumping object code. It also opens the possibility of profile-guided optimization in the future.
 
 https://v8.dev/blog/liftoff
+
+##
 
 ### LINKING AND RESOLUTION
 
@@ -42,6 +49,8 @@ The `_link_resolver` function is called during instantiation and it sets the add
 
 ![diagram](media/resolution.png)
 
+##
+
 ### PROPOSED API
 
 ```rs
@@ -57,6 +66,8 @@ module.dump(); // Module should be serializable to Vec<u8>.
 ```rs
 module.clone(); // Module should be cloneable.
 ```
+
+##
 
 ### EMBEDDING
 

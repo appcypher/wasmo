@@ -1,19 +1,18 @@
 // Copyright 2022 the Gigamono authors. All rights reserved. GPL-3.0 License.
 
 mod compiler;
-mod exports;
-mod imports;
+mod context;
+mod errors;
+mod export;
+mod import;
 mod instance;
 mod module;
-mod store;
 mod options;
+mod store;
 mod types;
 
-pub use compiler::*;
-pub use exports::*;
-pub use imports::*;
+pub use export::*;
+pub use import::*;
 pub use instance::*;
 pub use module::*;
-pub use store::*;
 pub use options::*;
-pub use types::*;

@@ -11,3 +11,12 @@
 > If you are looking to get started with the Gigamono framework, check the [Gigamono repo](https://github.com/gigamono/gigamono).
 
 ##
+
+### GOALS
+
+In this order.
+
+1. Simple implementation.
+2. Single-pass compilation.
+3. Serializable.
+4. Progressive optimisation.
