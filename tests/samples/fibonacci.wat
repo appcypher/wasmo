@@ -1,7 +1,18 @@
 (module
+    (import "host" "func" (func (param i32) (result i32 i32)))
+    (import "host" "mem" (memory 1 10))
+    (import "host" "table" (table 1 10 funcref))
+    (import "host" "global" (global i32))
+
     (memory $mem 1 10)
 
     (table $table 1 10 funcref)
+
+    (global $global i32)
+
+    (data $data (memory $mem) (offset (i32.const 0)) "\00\01\02\03")
+
+    (elem $elem (table $table) (offset (i32.const 0)) funcref (item (i32.const 0)))
 
     (func $_start (result i32)
         (call $fibonacci (i32.const 10))
@@ -11,6 +22,10 @@
         (local $dummy i32)
 
         (local.set $dummy (i32.const 100))
+
+        (i32.load (i32.const 0))
+
+        (drop)
 
         (i32.add (local.get $dummy) (i32.const 100))
     )
@@ -37,11 +52,6 @@
             )
         )
     )
-
-    ;; init.
-    (data $data (memory $mem) (offset (i32.const 0)) "\00\01\02\03")
-
-    (elem $elem (table $table) (offset (i32.const 0)) funcref (item (i32.const 0)))
 
     (export "_start" (func $_start))
 )

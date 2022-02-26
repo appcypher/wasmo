@@ -3,12 +3,7 @@
 use bytecheck::CheckBytes;
 use rkyv::{Archive, Deserialize, Serialize};
 
-pub struct Store {}
-
 #[derive(Debug, Serialize, Deserialize, Archive)]
 #[archive(compare(PartialEq))]
 #[archive_attr(derive(CheckBytes, Debug))]
-pub enum LocalityKind {
-    Imported,
-    Local,
-}
+pub struct Store {}

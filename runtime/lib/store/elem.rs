@@ -2,10 +2,31 @@
 
 use crate::context::Address;
 
-use super::LocalityKind;
+use bytecheck::CheckBytes;
+use rkyv::{Archive, Deserialize, Serialize};
 
-#[derive(Debug)]
-pub struct Elem {
-    pub kind: LocalityKind,
-    pub address: Address,
+#[derive(Debug, Serialize, Deserialize, Archive)]
+#[archive(compare(PartialEq))]
+#[archive_attr(derive(CheckBytes, Debug))]
+pub struct Element {
+    pub address: Option<Address>,
+    pub kind: ElementKind,
+}
+
+#[derive(Debug, Serialize, Deserialize, Archive)]
+#[archive(compare(PartialEq))]
+#[archive_attr(derive(CheckBytes, Debug))]
+pub enum ElementKind {
+    Passive,
+    Active { table_index: u32 },
+    Declared,
+}
+
+impl Element {
+    pub fn new(kind: ElementKind) -> Self {
+        Self {
+            kind,
+            address: None,
+        }
+    }
 }

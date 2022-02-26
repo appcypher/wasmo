@@ -3,6 +3,7 @@
 pub mod convert {
     use crate::{
         errors::CompilerError,
+        store::{DataKind, ElementKind},
         types::{FuncType, NumType, RefType, ValType},
     };
     use utilities::result::Result;
@@ -32,9 +33,30 @@ pub mod convert {
             wasmparser::Type::F32 => Ok(ValType::NumType(NumType::F32)),
             wasmparser::Type::F64 => Ok(ValType::NumType(NumType::F64)),
             wasmparser::Type::V128 => Ok(ValType::VecType),
-            wasmparser::Type::FuncRef => Ok(ValType::RefType(RefType::Func)),
-            wasmparser::Type::ExternRef => Ok(ValType::RefType(RefType::Extern)),
-            unsupported => Err(CompilerError::UnsupportedValType(unsupported.clone()).into()),
+            wasmparser::Type::FuncRef => Ok(ValType::RefType(RefType::FuncRef)),
+            wasmparser::Type::ExternRef => Ok(ValType::RefType(RefType::ExternRef)),
+            t => Err(CompilerError::UnsupportedValType(format!("{:?}", t)).into()),
+        }
+    }
+
+    /// Converts `wasmo` `DataKind` to `wasmparser` `DataKind`.
+    pub fn to_wasmo_data_kind(ty: &wasmparser::DataKind) -> DataKind {
+        match ty {
+            wasmparser::DataKind::Passive => DataKind::Passive,
+            wasmparser::DataKind::Active { memory_index, .. } => DataKind::Active {
+                memory_index: *memory_index,
+            },
+        }
+    }
+
+    /// Converts `wasmo` `ElementKind` to `wasmparser` `ElementKind`.
+    pub fn to_wasmo_element_kind(ty: &wasmparser::ElementKind) -> ElementKind {
+        match ty {
+            wasmparser::ElementKind::Passive => ElementKind::Passive,
+            wasmparser::ElementKind::Declared => ElementKind::Declared,
+            wasmparser::ElementKind::Active { table_index, .. } => ElementKind::Active {
+                table_index: *table_index,
+            },
         }
     }
 }

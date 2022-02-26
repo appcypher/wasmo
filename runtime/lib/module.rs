@@ -1,6 +1,6 @@
 // Copyright 2022 the Gigamono authors. All rights reserved. GPL-3.0 License.
 
-use crate::{compiler::Compiler, Instance, Options};
+use crate::{compiler::Compiler, Options};
 use bytecheck::CheckBytes;
 use rkyv::{Archive, Deserialize, Serialize};
 use utilities::result::Result;
@@ -27,11 +27,5 @@ impl Module {
         compiler.compile(wasm)?;
 
         Ok(Self { options, compiler })
-    }
-
-    /// Creates a new `Instance`.
-    pub fn instantiate(&self) -> Result<Instance> {
-        // Create instance.
-        Instance::new(self)
     }
 }

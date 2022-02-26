@@ -54,7 +54,7 @@ The `_link_resolver` function is called during instantiation and it sets the add
 ### PROPOSED API
 
 ```rs
-let imports = Imports::default(/* memories, tables, globals, functions */)?;
+let imports = Imports::default()?; // Memories, Tables, Globals, Functions
 let module = Module::new(&bytes, options)?; // Compiles with unresolved symbols. Creates trampolines.
 let instance = Instance::new(&module, &imports)?; // Links memory pieces. Makes imported functions where accessible.
 ```

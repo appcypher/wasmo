@@ -3,16 +3,14 @@
 mod compiler;
 mod context;
 mod errors;
-mod export;
-mod import;
 mod instance;
 mod module;
 mod options;
 mod store;
 mod types;
+mod imports;
 
-pub use export::*;
-pub use import::*;
 pub use instance::*;
 pub use module::*;
 pub use options::*;
+pub use imports::*;

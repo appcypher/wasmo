@@ -46,22 +46,31 @@ pub enum NumType {
 #[archive(compare(PartialEq))]
 #[archive_attr(derive(CheckBytes, Debug))]
 pub enum RefType {
-    Func,
-    Extern,
+    FuncRef,
+    ExternRef,
 }
 
-/// WebAssembly limits as defined in the spec.
+/// WebAssembly limits almost as defined in the spec.
+///
+/// A slight deviation from the current spec. Wasmo uses 64-bit types as there will be support for memory64 in the future.
 ///
 /// https://webassembly.github.io/spec/core/syntax/types.html#syntax-limits
-#[derive(Debug, Serialize, Deserialize, Archive)]
+#[derive(Debug, Serialize, Deserialize, Archive, Default)]
 #[archive(compare(PartialEq))]
 #[archive_attr(derive(CheckBytes, Debug))]
 pub struct Limits {
     /// Intial page count.
-    pub min: u32,
+    pub min: u64,
     /// Maximum page count.
-    pub max: u32,
+    pub max: Option<u64>,
 }
 
 /// Webassembly memory and table page size.
-pub const PAGE_SIZE: u32 = 65536;
+/// 64KiB.
+pub const _PAGE_SIZE: u32 = 65536;
+
+impl Limits {
+    pub fn new(min: u64, max: Option<u64>) -> Self {
+        Self { min, max }
+    }
+}

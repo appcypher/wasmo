@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 wasmo_runtime = { path = "../runtime" }
 wat = "1.0.41"
+env_logger = "0.9.0"
 
 [lib]
 path = "lib.rs"

@@ -5,6 +5,7 @@ mod test {
 
     #[test]
     fn test_parser() {
+        env_logger::init();
         let wasm = wat::parse_str(include_str!("../samples/fibonacci.wat")).unwrap();
         let _ = Module::new(&wasm, Options::default()).unwrap();
         assert!(true)

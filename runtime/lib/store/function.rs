@@ -2,15 +2,22 @@
 
 use crate::context::Address;
 
-use super::LocalityKind;
 use bytecheck::CheckBytes;
 use rkyv::{Archive, Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Archive)]
+#[derive(Debug, Serialize, Deserialize, Archive, Default)]
 #[archive(compare(PartialEq))]
 #[archive_attr(derive(CheckBytes, Debug))]
 pub struct Function {
-    pub typeidx: u32,
-    pub kind: LocalityKind,
-    pub address: Address,
+    pub type_index: u32,
+    pub address: Option<Address>,
+}
+
+impl Function {
+    pub fn new(type_index: u32) -> Self {
+        Self {
+            type_index,
+            address: None,
+        }
+    }
 }

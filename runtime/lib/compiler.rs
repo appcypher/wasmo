@@ -2,7 +2,9 @@
 
 mod compiler;
 mod llvm;
-mod value;
 mod utils;
+mod value;
+mod imports;
+mod exports;
 
 pub use compiler::*;

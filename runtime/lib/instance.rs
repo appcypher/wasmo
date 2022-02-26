@@ -7,17 +7,19 @@ use utilities::result::Result;
 /// External references (globals, functions, memories, tables) are resolved.
 /// And memories and tables have been created.
 #[derive(Debug)]
-pub struct Instance {}
+pub struct Instance<'a> {
+    _module: &'a Module,
+}
 
-impl Instance {
+impl<'a> Instance<'a> {
     /// Creates a new instance.
     /// Resolves external references (globals, functions, memories, tables) and creates memories and tables.
     ///
     /// Three main operations are performed:
     /// 1. Creation of memories and tables.
-    /// 2. Initialization of memories and tables.
-    /// 3. Linking which is the resolution of external references.
-    pub fn new(_module: &Module) -> Result<Self> {
-        Ok(Self {})
+    /// 2. Initialization of memories and tables from active data and elements.
+    /// 3. Linking; resolving external references using the details mentioned [here](https://github.com/gigamono/wasmo/blob/main/IDEAS.md)
+    pub fn new(module: &'a Module) -> Result<Self> {
+        Ok(Self { _module: module })
     }
 }

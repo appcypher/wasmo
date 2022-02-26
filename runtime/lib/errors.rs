@@ -4,9 +4,12 @@ use std::fmt::Display;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CompilerError {
-    UnsupportedInstanceType,
-    UnsupportedModuleType,
-    UnsupportedValType(wasmparser::Type),
+    UnsupportedTypeSectionEntry(String),
+    UnsupportedExportSectionEntry(String),
+    UnsupportedImportSectionEntry(String),
+    UnsupportedValType(String),
+    UnsupportedMemory64Proposal,
+    UnsupportedSection(String),
 }
 
 impl std::error::Error for CompilerError {}
