@@ -8,8 +8,6 @@
 
 `wasmo` is a WebAssembly compiler and runtime. It compiles WebAssembly code to native code with runtime memory, control integrity security as outlined by the WebAssembly spec.
 
-> If you are looking to get started with the Gigamono framework, check the [Gigamono repo](https://github.com/gigamono/gigamono).
-
 ##
 
 ### GOALS
