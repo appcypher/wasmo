@@ -20,7 +20,7 @@ The highly-optimised mode compiles the wasm binary once into executable code wit
 
 The lift-off mode compiles the wasm binary multiple times, progressively generating a more optimised executable with each iteration. Right now there will only be two iterations. Lift-off mode requires a hand-off process that can be a bit costly. This mode is useful for JIT scenarios where you need the module to start as fast as possible with deferred optimization.
 
-We are using OrcV2 because it promises concurrent compilation and makes JITing a lot easier with support for loading and dumping object code. It also opens the possibility of profile-guided optimization in the future.
+We are using OrcV2 because it promises concurrent compilation and makes JITing a lot easier with support for loading and dumping object code. It also opens up the opportunity of profile-guided optimization in the future.
 
 https://v8.dev/blog/liftoff
 
