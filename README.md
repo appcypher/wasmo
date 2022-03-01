@@ -1,6 +1,6 @@
 <div align="center">
     <a href="#" target="_blank">
-        <img src="https://raw.githubusercontent.com/appcypher/wasmo/master/media/wasmo.png" alt="Wasmo Logo" width="140" height="140"></img>
+        <img src="https://raw.githubusercontent.com/appcypher/wasmo-old/master/media/wasmo.png" alt="Wasmo Logo" width="140" height="140"></img>
     </a>
 </div>
 
