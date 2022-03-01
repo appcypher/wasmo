@@ -1,6 +1,6 @@
 // Copyright 2022 the Gigamono authors. All rights reserved. GPL-3.0 License.
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use log::debug;
 use utilities::result::Result;
@@ -13,7 +13,6 @@ use wasmparser::{
 use crate::{
     compiler::exports::ExportKind,
     errors::CompilerError,
-    store::{Data, Element, Function, Global, Memory, Table},
     types::{FuncType, Limits},
 };
 
@@ -23,6 +22,7 @@ use super::{
     llvm::LLVM,
     utils::convert,
     value::Value,
+    Data, Element, Function, Global, Memory, Table,
 };
 
 /// The compiler is responsible for compiling a module.

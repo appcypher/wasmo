@@ -1,8 +1,8 @@
 // Copyright 2022 the Gigamono authors. All rights reserved. GPL-3.0 License.
 
 use crate::{compiler::Compiler, Imports, Instance, Options};
+use serde::{Deserialize, Serialize};
 use utilities::result::Result;
-use serde::{Serialize, Deserialize};
 
 /// A WebAssembly module with compiled code but with unresolved external references.
 /// Memories and tables are also not created yet.
@@ -38,8 +38,6 @@ impl Module {
     ///
     /// Imported function references are resolved using the method described [here](https://github.com/gigamono/wasmo/blob/main/IDEAS.md)
     pub fn initialize(&self, _imports: &Imports) -> Result<Instance> {
-        // call_set_store_section_base_addresses(sections*)
-        //
         // call_add_imported_function_resolver(imports) // function resolution done at runtime
         //
         // call_resolve_imported_memories(imports)

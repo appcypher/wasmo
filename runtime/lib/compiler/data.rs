@@ -1,6 +1,6 @@
 // Copyright 2022 the Gigamono authors. All rights reserved. GPL-3.0 License.
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// The `Data` section contains the initial values of the linear memory.
 #[derive(Debug, Serialize, Deserialize)]

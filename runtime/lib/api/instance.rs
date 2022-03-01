@@ -1,15 +1,17 @@
 // Copyright 2022 the Gigamono authors. All rights reserved. GPL-3.0 License.
 
-use crate::{store::Store, Imports, Module};
+use super::Store;
+use crate::compiler::value::Value;
+use crate::{Imports, Module};
 use utilities::result::Result;
 
 /// An Instance is a fully resolved wasm runtime context.
 /// External references (globals, functions, memories, tables) are resolved.
 /// And memories and tables have been created.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Instance<'a> {
-    _module: &'a Module,
-    _store: Store,
+    _module: Option<&'a Module>,
+    _store: Option<Store>,
 }
 
 impl<'a> Instance<'a> {
@@ -18,7 +20,8 @@ impl<'a> Instance<'a> {
         module.initialize(imports)
     }
 
-    // pub fn invoke(_name: String, params: Vec<Value>) -> Result<Value> {
-    //     todo!()
-    // }
+    /// Invokes the function with the given name.
+    pub fn invoke(_name: String, _params: &[Value]) -> Result<Value> {
+        todo!()
+    }
 }

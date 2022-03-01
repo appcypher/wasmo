@@ -1,7 +1,7 @@
 // Copyright 2022 the Gigamono authors. All rights reserved. GPL-3.0 License.
 
-use serde::{Serialize, Deserialize};
 use crate::types::{Limits, ValType};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Table {

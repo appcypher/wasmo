@@ -2,8 +2,8 @@
 
 pub mod convert {
     use crate::{
+        compiler::{DataKind, ElementKind},
         errors::CompilerError,
-        store::{DataKind, ElementKind},
         types::{FuncType, NumType, RefType, ValType},
     };
     use utilities::result::Result;

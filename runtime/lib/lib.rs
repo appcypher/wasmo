@@ -1,10 +1,10 @@
 // Copyright 2022 the Gigamono authors. All rights reserved. GPL-3.0 License.
 
+mod api;
 mod compiler;
 mod context;
 mod errors;
-mod store;
+mod intrinsics;
 mod types;
-mod api;
 
 pub use api::*;
