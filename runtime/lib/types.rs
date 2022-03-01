@@ -1,14 +1,11 @@
 // Copyright 2022 the Gigamono authors. All rights reserved. GPL-3.0 License.
 
-use bytecheck::CheckBytes;
-use rkyv::{Archive, Deserialize, Serialize};
+use serde::{Serialize, Deserialize};
 
 /// WebAssembly function type as defined in the spec.
 ///
 /// https://webassembly.github.io/spec/core/syntax/types.html#syntax-functype
-#[derive(Debug, Serialize, Deserialize, Archive)]
-#[archive(compare(PartialEq))]
-#[archive_attr(derive(CheckBytes, Debug))]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct FuncType {
     pub params: Vec<ValType>,
     pub returns: Vec<ValType>,
@@ -17,9 +14,7 @@ pub struct FuncType {
 /// WebAssembly value types as defined in the spec.
 ///
 /// https://webassembly.github.io/spec/core/syntax/types.html#syntax-valtype
-#[derive(Debug, Serialize, Deserialize, Archive)]
-#[archive(compare(PartialEq))]
-#[archive_attr(derive(CheckBytes, Debug))]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum ValType {
     NumType(NumType), // i32, i64, f32, f64
     RefType(RefType), // funcref, externref
@@ -29,9 +24,7 @@ pub enum ValType {
 /// WebAssembly num types as defined in the spec.
 ///
 /// https://webassembly.github.io/spec/core/syntax/types.html#syntax-numtype
-#[derive(Debug, Serialize, Deserialize, Archive)]
-#[archive(compare(PartialEq))]
-#[archive_attr(derive(CheckBytes, Debug))]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum NumType {
     I32,
     I64,
@@ -42,9 +35,7 @@ pub enum NumType {
 /// WebAssembly num types as defined in the spec.
 ///
 /// https://webassembly.github.io/spec/core/syntax/types.html#syntax-reftype
-#[derive(Debug, Serialize, Deserialize, Archive)]
-#[archive(compare(PartialEq))]
-#[archive_attr(derive(CheckBytes, Debug))]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum RefType {
     FuncRef,
     ExternRef,
@@ -55,9 +46,7 @@ pub enum RefType {
 /// A slight deviation from the current spec. Wasmo uses 64-bit types as there will be support for memory64 in the future.
 ///
 /// https://webassembly.github.io/spec/core/syntax/types.html#syntax-limits
-#[derive(Debug, Serialize, Deserialize, Archive, Default)]
-#[archive(compare(PartialEq))]
-#[archive_attr(derive(CheckBytes, Debug))]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Limits {
     /// Intial page count.
     pub min: u64,

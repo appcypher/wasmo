@@ -1,17 +1,17 @@
 // Copyright 2022 the Gigamono authors. All rights reserved. GPL-3.0 License.
 
-use bytecheck::CheckBytes;
+use serde::{Serialize, Deserialize};
+
 use log::debug;
-use rkyv::{Archive, Deserialize, Serialize};
 use utilities::result::Result;
 use wasmparser::{
-    DataSectionReader, ElementSectionReader, ExportSectionReader, FunctionSectionReader,
-    GlobalSectionReader, ImportSectionEntryType, ImportSectionReader, MemorySectionReader, Parser,
-    Payload, TableSectionReader, TypeDef, TypeSectionReader,
+    DataSectionReader, ElementSectionReader, ExportSectionReader, FunctionBody,
+    FunctionSectionReader, GlobalSectionReader, ImportSectionEntryType, ImportSectionReader,
+    MemorySectionReader, Parser, Payload, TableSectionReader, TypeDef, TypeSectionReader,
 };
 
 use crate::{
-    context::CompileTimeResolver,
+    compiler::exports::ExportKind,
     errors::CompilerError,
     store::{Data, Element, Function, Global, Memory, Table},
     types::{FuncType, Limits},
@@ -26,14 +26,10 @@ use super::{
 };
 
 /// The compiler is responsible for compiling a module.
-#[derive(Debug, Serialize, Deserialize, Archive, Default)]
-#[archive(compare(PartialEq))]
-#[archive_attr(derive(CheckBytes, Debug))]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Compiler {
     /// Represents the result of LLVM codegen.
     pub llvm: Option<LLVM>,
-    /// The address resolver.
-    pub resolver: CompileTimeResolver,
     /// Option for enabling lift-off compilation.
     pub liftoff: bool,
     /// List of imported components of a module.
@@ -56,12 +52,12 @@ pub struct Compiler {
     pub data: Vec<Data>,
     /// Represents the current function being compiled.
     pub current_frame: Option<FunctionFrame>,
+    /// The start function.
+    pub start_function: Option<u32>,
 }
 
 /// Represents the current function being compiled.
-#[derive(Debug, Serialize, Deserialize, Archive, Default)]
-#[archive(compare(PartialEq))]
-#[archive_attr(derive(CheckBytes, Debug))]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct FunctionFrame {
     /// Local variables.
     pub locals: Vec<Value>,
@@ -78,7 +74,7 @@ impl Compiler {
         }
     }
 
-    /// Compiles the given wasm bytes.
+    /// Compiles provided wasm bytes.
     pub fn compile(&mut self, wasm: &[u8]) -> Result<()> {
         let mut _llvm = LLVM::new();
 
@@ -108,7 +104,6 @@ impl Compiler {
                 Payload::GlobalSection(reader) => {
                     debug!("======= GlobalSection =======");
                     self.compile_globals(reader)?;
-                    // llvm.codegen_globals(reader)?;
                 }
                 Payload::ExportSection(reader) => {
                     debug!("======= ExportSection =======");
@@ -129,37 +124,16 @@ impl Compiler {
                     debug!("======= DataSection =======");
                     self.compile_data(reader)?;
                 }
-                Payload::CustomSection {
-                    name,
-                    data_offset,
-                    data,
-                    range,
-                } => {
+                Payload::CustomSection { name, .. } => {
                     debug!("======= CustomSection =======");
                     debug!("custom section name: {:?}", name);
-                    debug!("data offset: {:?}", data_offset);
-                    debug!("data: {:?}", data);
-                    debug!("range: {:?}", range);
                 }
                 Payload::CodeSectionStart { .. } => {
                     debug!("======= CodeSectionStart =======");
                 }
                 Payload::CodeSectionEntry(body) => {
                     debug!("======= CodeSectionEntry =======");
-
-                    debug!("function body: {:?}", body);
-
-                    body.get_locals_reader().into_iter().for_each(|r| {
-                        r.into_iter().for_each(|i| {
-                            debug!("local: {:?}", i);
-                        });
-                    });
-
-                    body.get_operators_reader().into_iter().for_each(|r| {
-                        r.into_iter().for_each(|i| {
-                            debug!("operator: {:?}", i);
-                        });
-                    });
+                    self.compile_function_body(body)?;
                 }
                 Payload::ModuleSectionStart { .. } => {
                     debug!("======= ModuleSectionStart =======");
@@ -375,24 +349,28 @@ impl Compiler {
 
             match export.kind {
                 wasmparser::ExternalKind::Function => {
-                    self.exports
-                        .functions
-                        .push(Export::new(export.field.to_string(), export.index));
+                    self.exports.inner.insert(
+                        export.field.to_string(),
+                        Export::new(ExportKind::Function, export.index),
+                    );
                 }
                 wasmparser::ExternalKind::Table => {
-                    self.exports
-                        .tables
-                        .push(Export::new(export.field.to_string(), export.index));
+                    self.exports.inner.insert(
+                        export.field.to_string(),
+                        Export::new(ExportKind::Table, export.index),
+                    );
                 }
                 wasmparser::ExternalKind::Memory => {
-                    self.exports
-                        .memories
-                        .push(Export::new(export.field.to_string(), export.index));
+                    self.exports.inner.insert(
+                        export.field.to_string(),
+                        Export::new(ExportKind::Memory, export.index),
+                    );
                 }
                 wasmparser::ExternalKind::Global => {
-                    self.exports
-                        .globals
-                        .push(Export::new(export.field.to_string(), export.index));
+                    self.exports.inner.insert(
+                        export.field.to_string(),
+                        Export::new(ExportKind::Global, export.index),
+                    );
                 }
                 t => {
                     return Err(
@@ -407,7 +385,27 @@ impl Compiler {
 
     /// Compiles start function.
     pub fn compile_start_function(&mut self, _func: u32) -> Result<()> {
+        self.start_function = Some(_func);
         // llvm.codegen_start_function(reader)?;
+        Ok(())
+    }
+
+    /// Compiles function body.
+    pub fn compile_function_body(&mut self, body: FunctionBody) -> Result<()> {
+        debug!("function body: {:?}", body);
+
+        body.get_locals_reader().into_iter().for_each(|r| {
+            r.into_iter().for_each(|i| {
+                debug!("local: {:?}", i);
+            });
+        });
+
+        body.get_operators_reader().into_iter().for_each(|r| {
+            r.into_iter().for_each(|i| {
+                debug!("operator: {:?}", i);
+            });
+        });
+
         Ok(())
     }
 }

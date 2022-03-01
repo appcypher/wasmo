@@ -1,11 +1,9 @@
 // Copyright 2022 the Gigamono authors. All rights reserved. GPL-3.0 License.
-use bytecheck::CheckBytes;
-use rkyv::{Archive, Deserialize, Serialize};
+
+use serde::{Serialize, Deserialize};
 
 /// The different options for configuring the runtime.
-#[derive(Debug, Serialize, Deserialize, Archive, Default)]
-#[archive(compare(PartialEq))]
-#[archive_attr(derive(CheckBytes, Debug))]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Options {
     /// Whether to use the Liftoff compiler.
     pub liftoff: bool,

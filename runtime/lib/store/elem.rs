@@ -1,21 +1,13 @@
 // Copyright 2022 the Gigamono authors. All rights reserved. GPL-3.0 License.
 
-use crate::context::Address;
+use serde::{Deserialize, Serialize};
 
-use bytecheck::CheckBytes;
-use rkyv::{Archive, Deserialize, Serialize};
-
-#[derive(Debug, Serialize, Deserialize, Archive)]
-#[archive(compare(PartialEq))]
-#[archive_attr(derive(CheckBytes, Debug))]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Element {
-    pub address: Option<Address>,
     pub kind: ElementKind,
 }
 
-#[derive(Debug, Serialize, Deserialize, Archive)]
-#[archive(compare(PartialEq))]
-#[archive_attr(derive(CheckBytes, Debug))]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum ElementKind {
     Passive,
     Active { table_index: u32 },
@@ -24,9 +16,6 @@ pub enum ElementKind {
 
 impl Element {
     pub fn new(kind: ElementKind) -> Self {
-        Self {
-            kind,
-            address: None,
-        }
+        Self { kind }
     }
 }

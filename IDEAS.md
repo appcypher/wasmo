@@ -12,6 +12,7 @@ In this order.
 ### MODES
 
 Wasmo supports two modes of compilation:
+
 1. Highly-Optimised Mode
 2. Lift-Off Mode
 
@@ -27,9 +28,10 @@ https://v8.dev/blog/liftoff
 
 ### LINKING AND RESOLUTION
 
-When a wasm module is compiled, the internal functions and globals are resolved to their final addresses. But runtime context-dependent elements are not.
+When a wasm module is compiled, the internal functions and globals are resolved to their final addresses. But runtime context-dependent objects are not.
 
-Context-dependent elements include:
+Context-dependent objects include:
+
 1. Imported functions
 2. Imported globals
 3. All memories
@@ -42,10 +44,10 @@ One thing to note is that traditional linking is different from wasm module inst
 In traditional linking, the in-memory executable asks for an external symbol (in a shared library) to be resolved, so the shared library is loaded into memory on as needed basis.
 The shared library doesn't have to know anything about the in-memory executable.
 
-In wasm's case however, you can think of the in-memory executables as the runtime context. Runtime context refers to imported functions, imported globals, memories and tables instantiated by the host. These objects are dynamic. Memories and globals for example cannot be shared between processes. On the other hand, the compiled module becomes the _shared library_ in this situation because it can be shared between different runtime contexts. But unlike traditional linking, the module (the _shared library_) calls the runtime context. This makes typical PIC and load-time relocation strategies unapplicable. It needs to modified.
+In wasm's case however, you can think of the in-memory executables as the runtime context. Runtime context refers to imported functions, imported globals, memories and tables instantiated by the host. These objects are dynamic. Memories and globals for example cannot be shared between processes. On the other hand, the compiled module becomes the _shared library_ in this situation because it can be shared between different runtime contexts. But unlike traditional linking, the module (the _shared library_) calls the runtime con text. This makes typical PIC and load-time relocation strategies unapplicable. It needs to modified.
 
-For wasmo, we generate a `_link_resolver` function and a _special data section_ for every module. These properties are inaccessible to internal WebAssembly functions.
-The `_link_resolver` function is called during instantiation and it sets the address of the external resolver function in the special data section.
+For wasmo, we generate a `add_imported_function_resolver` function and a _special data section_ for every module. These properties are inaccessible to internal WebAssembly objects.
+The `add_imported_function_resolver` function is called during instantiation and it sets the address of the external resolver function in the special data section.
 
 ![diagram](media/resolution.png)
 

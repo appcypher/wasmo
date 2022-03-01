@@ -1,9 +1,16 @@
 // Copyright 2022 the Gigamono authors. All rights reserved. GPL-3.0 License.
 
-use bytecheck::CheckBytes;
-use rkyv::{Archive, Deserialize, Serialize};
+use serde::{Serialize, Deserialize};
 
-#[derive(Debug, Serialize, Deserialize, Archive)]
-#[archive(compare(PartialEq))]
-#[archive_attr(derive(CheckBytes, Debug))]
-pub struct Store {}
+use crate::context::BaseAddress;
+
+/// Store maintains maintains pointers to data sections representing the entire global state of a WebAssembly
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Store {
+    // Local Memories
+    pub memories_section: BaseAddress,
+    pub tables_section: BaseAddress,
+    pub globals_section: BaseAddress,
+    pub elems_section: BaseAddress,
+    pub data_section: BaseAddress,
+}

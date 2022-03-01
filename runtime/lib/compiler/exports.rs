@@ -1,28 +1,30 @@
 // Copyright 2022 the Gigamono authors. All rights reserved. GPL-3.0 License.
 
-use bytecheck::CheckBytes;
-use rkyv::{Archive, Deserialize, Serialize};
+use std::collections::HashMap;
 
-#[derive(Debug, Serialize, Deserialize, Archive, Default)]
-#[archive(compare(PartialEq))]
-#[archive_attr(derive(CheckBytes, Debug))]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Exports {
-    pub memories: Vec<Export>,
-    pub tables: Vec<Export>,
-    pub functions: Vec<Export>,
-    pub globals: Vec<Export>,
+    pub(crate) inner: HashMap<String, Export>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Archive, Default)]
-#[archive(compare(PartialEq))]
-#[archive_attr(derive(CheckBytes, Debug))]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Export {
-    pub field: String,
+    pub kind: ExportKind,
     pub index: u32,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub enum ExportKind {
+    Memory,
+    Table,
+    Function,
+    Global,
+}
+
 impl Export {
-    pub fn new(field: String, index: u32) -> Self {
-        Self { field, index }
+    pub fn new(kind: ExportKind, index: u32) -> Self {
+        Self { kind, index }
     }
 }

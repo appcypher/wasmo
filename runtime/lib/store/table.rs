@@ -1,19 +1,12 @@
 // Copyright 2022 the Gigamono authors. All rights reserved. GPL-3.0 License.
 
-use crate::{
-    context::Address,
-    types::{Limits, ValType},
-};
-use bytecheck::CheckBytes;
-use rkyv::{Archive, Deserialize, Serialize};
+use serde::{Serialize, Deserialize};
+use crate::types::{Limits, ValType};
 
-#[derive(Debug, Serialize, Deserialize, Archive)]
-#[archive(compare(PartialEq))]
-#[archive_attr(derive(CheckBytes, Debug))]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Table {
     pub limits: Limits,
     pub element_type: ValType,
-    pub address: Option<Address>,
 }
 
 impl Table {
@@ -21,7 +14,6 @@ impl Table {
         Self {
             limits,
             element_type,
-            address: None,
         }
     }
 }

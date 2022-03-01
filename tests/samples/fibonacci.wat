@@ -12,7 +12,10 @@
 
     (data $data (memory $mem) (offset (i32.const 0)) "\00\01\02\03")
 
-    (elem $elem (table $table) (offset (i32.const 0)) funcref (item (i32.const 0)))
+    (elem $elem (table $table) (offset (i32.const 0)) funcref
+        (item (i32.const 1))
+        (item (i32.const 2))
+    )
 
     (func $_start (result i32)
         (call $fibonacci (i32.const 10))

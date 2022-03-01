@@ -1,9 +1,8 @@
 // Copyright 2022 the Gigamono authors. All rights reserved. GPL-3.0 License.
 
-use bytecheck::CheckBytes;
-use rkyv::{Archive, Deserialize, Serialize};
+use serde::{Serialize, Deserialize};
 
-#[derive(Debug, Serialize, Deserialize, Archive, Default)]
-#[archive(compare(PartialEq))]
-#[archive_attr(derive(CheckBytes, Debug))]
-pub struct Address(); // TODO(appcypher): cfg based on the current platform or target info.
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct BaseAddress {
+    // pub address: T, // TODO(appcypher): Make this machine-dependent
+}

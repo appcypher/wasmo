@@ -3,14 +3,8 @@
 mod compiler;
 mod context;
 mod errors;
-mod instance;
-mod module;
-mod options;
 mod store;
 mod types;
-mod imports;
+mod api;
 
-pub use instance::*;
-pub use module::*;
-pub use options::*;
-pub use imports::*;
+pub use api::*;

@@ -1,25 +1,17 @@
 // Copyright 2022 the Gigamono authors. All rights reserved. GPL-3.0 License.
 
-use crate::context::Address;
-
-use bytecheck::CheckBytes;
-use rkyv::{Archive, Deserialize, Serialize};
+use serde::{Serialize, Deserialize};
 
 /// The `Data` section contains the initial values of the linear memory.
-#[derive(Debug, Serialize, Deserialize, Archive)]
-#[archive(compare(PartialEq))]
-#[archive_attr(derive(CheckBytes, Debug))]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Data {
-    pub address: Option<Address>,
     pub kind: DataKind,
 }
 
 /// The kind of data segment.
 ///
 /// https://github.com/WebAssembly/multi-memory/blob/main/proposals/bulk-memory-operations/Overview.md#data-segments
-#[derive(Debug, Serialize, Deserialize, Archive)]
-#[archive(compare(PartialEq))]
-#[archive_attr(derive(CheckBytes, Debug))]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum DataKind {
     /// Passive represents a data segment that is not initialized by the program.
     Passive,
@@ -31,9 +23,6 @@ pub enum DataKind {
 
 impl Data {
     pub fn new(kind: DataKind) -> Self {
-        Self {
-            address: None,
-            kind,
-        }
+        Self { kind }
     }
 }
