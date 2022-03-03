@@ -1,5 +1,7 @@
 // Copyright 2022 the Gigamono authors. All rights reserved. GPL-3.0 License.
 
+use std::pin::Pin;
+
 use serde::{Deserialize, Serialize};
 
 use log::debug;
@@ -28,8 +30,9 @@ use super::{
 /// The compiler is responsible for compiling a module.
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Compiler {
-    /// Represents the result of LLVM codegen.
-    pub llvm: Option<LLVM>,
+    #[serde(skip)]
+    /// The LLVM context.
+    llvm: Option<Pin<Box<LLVM>>>,
     /// Option for enabling lift-off compilation.
     pub liftoff: bool,
     /// List of imported components of a module.
@@ -76,7 +79,7 @@ impl Compiler {
 
     /// Compiles provided wasm bytes.
     pub fn compile(&mut self, wasm: &[u8]) -> Result<()> {
-        let mut _llvm = LLVM::new();
+        let llvm = LLVM::new()?;
 
         for payload in Parser::new(0).parse_all(wasm) {
             match payload? {
@@ -152,6 +155,11 @@ impl Compiler {
                 }
             }
         }
+
+        // Print module.
+        llvm.module.as_ref().unwrap().print();
+
+        self.llvm = Some(llvm);
 
         Ok(())
     }

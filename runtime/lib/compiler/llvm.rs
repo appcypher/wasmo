@@ -1,8 +1,10 @@
 // Copyright 2022 the Gigamono authors. All rights reserved. GPL-3.0 License.
 
-mod addresses;
-mod initializers;
+mod context;
+mod function;
 mod llvm;
-mod resolvers;
+mod module;
+mod types;
+mod utils;
 
-pub use llvm::*;
+pub(crate) use llvm::*;

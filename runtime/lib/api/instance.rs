@@ -22,6 +22,7 @@ impl<'a> Instance<'a> {
 
     /// Invokes the function with the given name.
     pub fn invoke(_name: String, _params: &[Value]) -> Result<Value> {
+        // TODO(appcypher): Implement this.
         todo!()
     }
 }

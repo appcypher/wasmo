@@ -10,7 +10,7 @@ use utilities::result::Result;
 /// Module is serializable and can be shared across threads.
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Module {
-    options: Options,
+    pub options: Options,
     compiler: Compiler,
 }
 
@@ -52,6 +52,7 @@ impl Module {
 
         // Each resolution updating the Store.
 
+        // TODO(appcypher): Implement.
         todo!()
     }
 }
