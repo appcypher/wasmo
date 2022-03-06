@@ -1,8 +1,8 @@
 // Copyright 2022 the Gigamono authors. All rights reserved. GPL-3.0 License.
 
 use crate::{compiler::Compiler, Imports, Instance, Options};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use utilities::result::Result;
 
 /// A WebAssembly module with compiled code but with unresolved external references.
 /// Memories and tables are also not created yet.

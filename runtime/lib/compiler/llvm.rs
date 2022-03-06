@@ -5,6 +5,5 @@ mod function;
 mod llvm;
 mod module;
 mod types;
-mod utils;
 
 pub(crate) use llvm::*;

@@ -2,9 +2,9 @@
 
 use std::pin::Pin;
 
-use super::{context::LLContext, module::LLModule, utils::LLString};
+use super::{context::LLContext, module::LLModule};
 use llvm_sys::core::LLVMShutdown;
-use utilities::result::Result;
+use anyhow::Result;
 
 /// Converts WebAssembly semantics to LLVM code, handles materialization.
 ///
@@ -44,8 +44,8 @@ use utilities::result::Result;
 /// - loading important values like memory address into registers
 #[derive(Debug)]
 pub(crate) struct LLVM {
-    pub(crate) module: Option<Pin<Box<LLModule>>>,
-    context: LLContext,
+    pub(crate) context: LLContext,
+    pub(crate) module: Option<LLModule>,
 }
 
 impl LLVM {
@@ -59,10 +59,7 @@ impl LLVM {
         });
 
         // The module field references the context field so this is self-referential.
-        this.module = Some(LLModule::new(
-            LLString::try_from("main module")?,
-            this.context.as_ptr(),
-        )?);
+        this.module = Some(LLModule::new("initial", &this.context)?);
 
         Ok(this)
     }

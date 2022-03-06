@@ -3,7 +3,7 @@
 use super::Store;
 use crate::compiler::value::Value;
 use crate::{Imports, Module};
-use utilities::result::Result;
+use anyhow::Result;
 
 /// An Instance is a fully resolved wasm runtime context.
 /// External references (globals, functions, memories, tables) are resolved.

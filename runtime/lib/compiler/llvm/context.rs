@@ -1,18 +1,22 @@
 // Copyright 2022 the Gigamono authors. All rights reserved. GPL-3.0 License.
 
-use std::pin::Pin;
+use std::rc::Rc;
 
+use anyhow::Result;
 use llvm_sys::{
-    core::{
-        LLVMContextCreate, LLVMContextDispose, LLVMDoubleTypeInContext, LLVMFloatTypeInContext,
-        LLVMInt32TypeInContext, LLVMInt64TypeInContext,
-    },
+    core::{LLVMContextCreate, LLVMContextDispose},
     prelude::LLVMContextRef,
 };
 
-use super::types::{LLFunctionType, LLType, LLTypeRef};
+use super::{
+    module::LLModule,
+    types::{LLFunctionType, LLType, LLTypeKind},
+};
 
 /// This a wrapper for LLVM Context.
+///
+/// # Ownership
+/// Owns the LLVM Module.
 #[derive(Debug)]
 pub(crate) struct LLContext {
     context_ref: LLVMContextRef,
@@ -25,40 +29,36 @@ impl LLContext {
         }
     }
 
+    pub(crate) fn create_module(&self, name: &str) -> Result<LLModule> {
+        LLModule::new(name, self)
+    }
+
     pub(crate) fn as_ptr(&self) -> LLVMContextRef {
         self.context_ref
     }
 
     pub(crate) fn i64_type(&self) -> LLType {
-        LLType::I64(LLTypeRef::new(unsafe {
-            LLVMInt64TypeInContext(self.context_ref)
-        }))
+        LLType::new(self, LLTypeKind::I64)
     }
 
     pub(crate) fn i32_type(&self) -> LLType {
-        LLType::I64(LLTypeRef::new(unsafe {
-            LLVMInt32TypeInContext(self.context_ref)
-        }))
+        LLType::new(self, LLTypeKind::I32)
     }
 
     pub(crate) fn f64_type(&self) -> LLType {
-        LLType::I64(LLTypeRef::new(unsafe {
-            LLVMDoubleTypeInContext(self.context_ref)
-        }))
+        LLType::new(self, LLTypeKind::F64)
     }
 
     pub(crate) fn f32_type(&self) -> LLType {
-        LLType::I64(LLTypeRef::new(unsafe {
-            LLVMFloatTypeInContext(self.context_ref)
-        }))
+        LLType::new(self, LLTypeKind::F32)
     }
 
-    pub(crate) fn function_type<'t>(
+    pub(crate) fn function_type(
         &self,
-        params: &'t [LLType],
-        result: &'t LLType,
+        params: &[LLType],
+        result: &LLType,
         is_varargs: bool,
-    ) -> Pin<Box<LLFunctionType<'t>>> {
+    ) -> Rc<LLFunctionType> {
         LLFunctionType::new(params, result, is_varargs)
     }
 }

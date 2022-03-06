@@ -5,7 +5,7 @@ use std::pin::Pin;
 use serde::{Deserialize, Serialize};
 
 use log::debug;
-use utilities::result::Result;
+use anyhow::Result;
 use wasmparser::{
     DataSectionReader, ElementSectionReader, ExportSectionReader, FunctionBody,
     FunctionSectionReader, GlobalSectionReader, ImportSectionEntryType, ImportSectionReader,

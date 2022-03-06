@@ -6,7 +6,7 @@ pub mod convert {
         errors::CompilerError,
         types::{FuncType, NumType, RefType, ValType},
     };
-    use utilities::result::Result;
+    use anyhow::Result;
 
     /// Converts `wasmparser` `FuncType` to `wasmo` `FuncType`.
     pub fn to_wasmo_functype(ty: &wasmparser::FuncType) -> Result<FuncType> {
