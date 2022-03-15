@@ -1,4 +1,3 @@
-// Copyright 2022 the Gigamono authors. All rights reserved. GPL-3.0 License.
 
 use std::{ffi::CString, rc::Rc};
 
@@ -26,7 +25,7 @@ use super::{context::LLContext, function::LLFunction, types::LLFunctionType};
 /// - https://lists.llvm.org/pipermail/llvm-dev/2018-September/126134.html
 /// - https://llvm.org/doxygen/Module_8cpp_source.html#l00079
 /// - https://llvm.org/doxygen/LLVMContextImpl_8cpp_source.html#l00052
-/// 
+///
 /// # Ownership
 /// ???
 ///

@@ -1,10 +1,8 @@
-// Copyright 2022 the Gigamono authors. All rights reserved. GPL-3.0 License.
-
 use std::pin::Pin;
 
 use super::{context::LLContext, module::LLModule};
-use llvm_sys::core::LLVMShutdown;
 use anyhow::Result;
+use llvm_sys::core::LLVMShutdown;
 
 /// Converts WebAssembly semantics to LLVM code, handles materialization.
 ///

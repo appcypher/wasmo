@@ -1,5 +1,3 @@
-// Copyright 2022 the Gigamono authors. All rights reserved. GPL-3.0 License.
-
 use crate::{compiler::Compiler, Imports, Instance, Options};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};

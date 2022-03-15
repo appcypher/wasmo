@@ -1,5 +1,3 @@
-// Copyright 2022 the Gigamono authors. All rights reserved. GPL-3.0 License.
-
 use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
