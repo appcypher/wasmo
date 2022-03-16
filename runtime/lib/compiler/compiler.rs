@@ -1,10 +1,9 @@
-
 use std::pin::Pin;
 
 use serde::{Deserialize, Serialize};
 
-use log::debug;
 use anyhow::Result;
+use log::debug;
 use wasmparser::{
     DataSectionReader, ElementSectionReader, ExportSectionReader, FunctionBody,
     FunctionSectionReader, GlobalSectionReader, ImportSectionEntryType, ImportSectionReader,
@@ -29,11 +28,20 @@ use super::{
 /// The compiler is responsible for compiling a module.
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Compiler {
-    #[serde(skip)]
     /// The LLVM context.
-    llvm: Option<Pin<Box<LLVM>>>,
+    #[serde(skip)]
+    pub(crate) llvm: Option<Pin<Box<LLVM>>>,
     /// Option for enabling lift-off compilation.
     pub liftoff: bool,
+    // TODO(appcypher): This looks like it can be dropped after compilation.
+    /// Compiler data.
+    pub data: CompilerData,
+}
+
+/// It contains artefacts generated during compilation.
+/// They help with Webassembly semantics.
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub(crate) struct CompilerData {
     /// List of imported components of a module.
     pub imports: Imports,
     /// List of exported components of a module.
@@ -78,14 +86,14 @@ impl Compiler {
 
     /// Compiles provided wasm bytes.
     pub fn compile(&mut self, wasm: &[u8]) -> Result<()> {
-        let llvm = LLVM::new()?;
+        let mut llvm = LLVM::new()?;
 
         for payload in Parser::new(0).parse_all(wasm) {
             match payload? {
                 Payload::Version { .. } => (),
                 Payload::TypeSection(reader) => {
                     debug!("======= TypeSection =======");
-                    self.compile_types(reader)?;
+                    self.compile_types(reader, &mut llvm)?;
                 }
                 Payload::ImportSection(reader) => {
                     debug!("======= ImportSection =======");
@@ -166,7 +174,7 @@ impl Compiler {
 
 impl Compiler {
     /// Compiles function types in type section.
-    pub fn compile_types(&mut self, reader: TypeSectionReader) -> Result<()> {
+    pub fn compile_types(&mut self, reader: TypeSectionReader, llvm: &mut LLVM) -> Result<()> {
         for result in reader.into_iter() {
             let typedef = result?;
 
@@ -174,7 +182,11 @@ impl Compiler {
 
             match typedef {
                 TypeDef::Func(ty) => {
-                    self.types.push(convert::to_wasmo_functype(&ty)?);
+                    let func_ty = convert::to_wasmo_functype(&ty)?;
+
+                    llvm.add_type(convert::to_llvm_functype(func_ty));
+
+                    self.data.types.push(func_ty);
                 }
                 t => {
                     return Err(
@@ -196,22 +208,22 @@ impl Compiler {
 
             match import.ty {
                 ImportSectionEntryType::Function(index) => {
-                    self.imports.functions.push(Import::new(
+                    self.data.imports.functions.push(Import::new(
                         import.module.to_string(),
                         import.field.map(|s| s.to_string()),
-                        self.functions.len() as u32,
+                        self.data.functions.len() as u32,
                     ));
 
-                    self.functions.push(Function::new(index));
+                    self.data.functions.push(Function::new(index));
                 }
                 ImportSectionEntryType::Table(ty) => {
-                    self.imports.tables.push(Import::new(
+                    self.data.imports.tables.push(Import::new(
                         import.module.to_string(),
                         import.field.map(|s| s.to_string()),
-                        self.tables.len() as u32,
+                        self.data.tables.len() as u32,
                     ));
 
-                    self.tables.push(Table::new(
+                    self.data.tables.push(Table::new(
                         Limits::new(ty.initial as u64, ty.maximum.map(|x| x as u64)),
                         convert::to_wasmo_valtype(&ty.element_type)?,
                     ));
@@ -222,23 +234,24 @@ impl Compiler {
                         return Err(CompilerError::UnsupportedMemory64Proposal.into());
                     }
 
-                    self.imports.memories.push(Import::new(
+                    self.data.imports.memories.push(Import::new(
                         import.module.to_string(),
                         import.field.map(|s| s.to_string()),
-                        self.memories.len() as u32,
+                        self.data.memories.len() as u32,
                     ));
 
-                    self.memories
+                    self.data
+                        .memories
                         .push(Memory::new(Limits::new(ty.initial, ty.maximum), ty.shared));
                 }
                 ImportSectionEntryType::Global(ty) => {
-                    self.imports.globals.push(Import::new(
+                    self.data.imports.globals.push(Import::new(
                         import.module.to_string(),
                         import.field.map(|s| s.to_string()),
-                        self.globals.len() as u32,
+                        self.data.globals.len() as u32,
                     ));
 
-                    self.globals.push(Global::new(
+                    self.data.globals.push(Global::new(
                         convert::to_wasmo_valtype(&ty.content_type)?,
                         ty.mutable,
                     ));
@@ -261,7 +274,7 @@ impl Compiler {
 
             debug!("function type_index: {:?}", type_index);
 
-            self.functions.push(Function::new(type_index));
+            self.data.functions.push(Function::new(type_index));
         }
 
         Ok(())
@@ -274,7 +287,7 @@ impl Compiler {
 
             debug!("table type: {:?}", ty);
 
-            self.tables.push(Table::new(
+            self.data.tables.push(Table::new(
                 Limits::new(ty.initial as u64, ty.maximum.map(|x| x as u64)),
                 convert::to_wasmo_valtype(&ty.element_type)?,
             ));
@@ -290,7 +303,7 @@ impl Compiler {
 
             debug!("memory type: {:?}", ty);
 
-            self.memories
+            self.data.memories
                 .push(Memory::new(Limits::new(ty.initial, ty.maximum), ty.shared));
         }
 
@@ -304,7 +317,7 @@ impl Compiler {
 
             debug!("global: {:?}", global);
 
-            self.globals.push(Global::new(
+            self.data.globals.push(Global::new(
                 convert::to_wasmo_valtype(&global.ty.content_type)?,
                 global.ty.mutable,
             ));
@@ -338,7 +351,7 @@ impl Compiler {
 
             debug!("elem items: {:?}", elem.items);
 
-            self.elements
+            self.data.elements
                 .push(Element::new(convert::to_wasmo_element_kind(&elem.kind)));
 
             // llvm.codegen_element(reader)?;
@@ -356,25 +369,25 @@ impl Compiler {
 
             match export.kind {
                 wasmparser::ExternalKind::Function => {
-                    self.exports.inner.insert(
+                    self.data.exports.inner.insert(
                         export.field.to_string(),
                         Export::new(ExportKind::Function, export.index),
                     );
                 }
                 wasmparser::ExternalKind::Table => {
-                    self.exports.inner.insert(
+                    self.data.exports.inner.insert(
                         export.field.to_string(),
                         Export::new(ExportKind::Table, export.index),
                     );
                 }
                 wasmparser::ExternalKind::Memory => {
-                    self.exports.inner.insert(
+                    self.data.exports.inner.insert(
                         export.field.to_string(),
                         Export::new(ExportKind::Memory, export.index),
                     );
                 }
                 wasmparser::ExternalKind::Global => {
-                    self.exports.inner.insert(
+                    self.data.exports.inner.insert(
                         export.field.to_string(),
                         Export::new(ExportKind::Global, export.index),
                     );
@@ -392,7 +405,7 @@ impl Compiler {
 
     /// Compiles start function.
     pub fn compile_start_function(&mut self, _func: u32) -> Result<()> {
-        self.start_function = Some(_func);
+        self.data.start_function = Some(_func);
         // llvm.codegen_start_function(reader)?;
         Ok(())
     }

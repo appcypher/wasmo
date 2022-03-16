@@ -1,6 +1,6 @@
 pub mod convert {
     use crate::{
-        compiler::{DataKind, ElementKind},
+        compiler::{llvm::types::LLFunctionType, DataKind, ElementKind},
         errors::CompilerError,
         types::{FuncType, NumType, RefType, ValType},
     };
@@ -56,5 +56,26 @@ pub mod convert {
                 table_index: *table_index,
             },
         }
+    }
+
+    pub fn to_llvm_functype(ty: &FuncType) -> Result<LLFunctionType> {
+        // let params = ty
+        //     .params
+        //     .iter()
+        //     .map(|i| to_llvm_valtype(i))
+        //     .collect::<Result<Vec<_>>>()?;
+
+        // let returns = ty
+        //     .returns
+        //     .iter()
+        //     .map(|i| to_llvm_valtype(i))
+        //     .collect::<Result<Vec<_>>>()?;
+
+        // Ok(llvm_sys::core::LLVMFunctionType(
+        //     llvm_sys::core::LLVMVoidType(),
+        //     params.as_ptr(),
+        //     params.len() as u32,
+        //     0,
+        // ))
     }
 }

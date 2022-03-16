@@ -65,6 +65,7 @@ impl LLType {
 /// WARNING:
 /// It is unsafe to use the function reference because the params can be dropped when this struct goes out of scope.
 /// It is important to make sure the function is not dropped before the dependents.
+#[derive(Debug)]
 pub(crate) struct LLFunctionType {
     params: Vec<LLVMTypeRef>,
     result: LLVMTypeRef,

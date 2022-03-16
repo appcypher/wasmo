@@ -27,8 +27,9 @@ use super::{context::LLContext, function::LLFunction, types::LLFunctionType};
 /// - https://llvm.org/doxygen/LLVMContextImpl_8cpp_source.html#l00052
 ///
 /// # Ownership
-/// ???
+/// Owns the functions and globals added to it.
 ///
+/// - https://llvm.org/doxygen/Module_8cpp_source.html#l00079
 #[derive(Debug)]
 pub(crate) struct LLModule {
     module_ref: LLVMModuleRef,
@@ -52,7 +53,9 @@ impl LLModule {
     /// Adds a function to the module.
     ///
     /// # Safety
-    /// TODO(appcypher): Investigate safety properly.
+    /// Function added to module gets released when the module is dropped.
+    ///
+    /// - https://llvm.org/doxygen/Module_8cpp_source.html#l00079
     pub(crate) fn add_function(
         &self,
         name: &str,
