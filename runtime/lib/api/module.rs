@@ -1,4 +1,4 @@
-use crate::{compiler::Compiler, Imports, Instance, Options};
+use crate::{compiler::Compiler, Imports, Instance, Options, Store};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
@@ -10,6 +10,12 @@ use serde::{Deserialize, Serialize};
 pub struct Module {
     pub options: Options,
     compiler: Compiler,
+}
+
+/// Options available for initialiazing a module.
+#[derive(Debug, Default)]
+pub struct InitializeOpts {
+    store: Option<Store>,
 }
 
 impl Module {
@@ -26,30 +32,16 @@ impl Module {
 
     /// Creates a WebAssembly instance.
     ///
-    /// Resolves external references (globals, functions, memories, tables) and creates internal memories and tables.
+    /// Resolves and initialises the instance.
     ///
-    /// Four main operations performed are:
-    /// 1. Creation of local memories and tables.
-    /// 2. Initialization of local memories, tables and globals.
-    /// 3. Resolving imported references.
-    /// 4. Calling the start function.
-    ///
-    /// Imported function references are resolved using the method described [here](https://github.com/gigamono/wasmo/blob/main/IDEAS.md)
-    pub fn initialize(&self, _imports: &Imports) -> Result<Instance> {
-        // call_add_imported_function_resolver(imports) // function resolution done at runtime
-        //
-        // call_resolve_imported_memories(imports)
-        // call_resolve_imported_tables(imports)
-        // call_resolve_imported_globals(imports)
-        //
-        // call_initialize_local_memories() // data segment initializer
-        // call_initialize_local_tables() // table segment initializer
-        // call_initialize_local_globals() // global variable initializer
-        //
-        // call_start()
-
-        // Each resolution updating the Store.
-
+    /// Five main operations performed are:
+    /// 1. Fix up resolver address.
+    /// 2. Resolve imported memories, tables and globals.
+    /// 3. Create local memories, tables and globals.
+    /// 4. Populate memories, tables and globals.
+    /// 5. Call start function.
+    pub fn initialize(&self, _imports: &Imports, _opts: InitializeOpts) -> Result<Instance> {
+        // TODO(appcypher): Create Store or use the one in opts.
         // TODO(appcypher): Implement.
         todo!()
     }

@@ -4,13 +4,13 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Store {
 // Imported Memories
-// Local Memories
-
 // Imported Tables
-// Local Tables
-
 // Imported Globals
+// Local Memories
+// Local Tables
 // Local Globals
 
 // Imported Functions
+// Intrinsics
+// Version
 }

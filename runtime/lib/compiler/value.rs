@@ -2,9 +2,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Value {
-    NumVal(NumVal),
-    RefVal(RefVal),
-    VecVal(i128),
+    Num(NumVal),
+    Ref(RefVal),
+    Vec(i128),
 }
 
 #[derive(Debug, Serialize, Deserialize)]

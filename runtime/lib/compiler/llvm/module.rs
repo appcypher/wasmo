@@ -1,4 +1,3 @@
-
 use std::{ffi::CString, rc::Rc};
 
 use anyhow::Result;
@@ -8,7 +7,7 @@ use llvm_sys::{
     prelude::LLVMModuleRef,
 };
 
-use super::{context::LLContext, function::LLFunction, types::LLFunctionType};
+use super::{context::LLContext, function::LLFunction};
 
 /// A wrapper for LLVM Module.
 ///
@@ -33,6 +32,7 @@ use super::{context::LLContext, function::LLFunction, types::LLFunctionType};
 #[derive(Debug)]
 pub(crate) struct LLModule {
     module_ref: LLVMModuleRef,
+    functions: Vec<Rc<LLFunction>>,
 }
 
 impl LLModule {
@@ -47,6 +47,7 @@ impl LLModule {
             module_ref: unsafe {
                 LLVMModuleCreateWithNameInContext(CString::new(name)?.as_ptr(), context.as_ptr())
             },
+            functions: vec![],
         })
     }
 
@@ -56,15 +57,11 @@ impl LLModule {
     /// Function added to module gets released when the module is dropped.
     ///
     /// - https://llvm.org/doxygen/Module_8cpp_source.html#l00079
-    pub(crate) fn add_function(
-        &self,
-        name: &str,
-        signature: Rc<LLFunctionType>,
-    ) -> Result<LLFunction> {
-        LLFunction::new(name, self, signature)
+    pub(crate) fn add_function(&mut self, function: Rc<LLFunction>) {
+        self.functions.push(function)
     }
 
-    pub(crate) fn as_ptr(&self) -> LLVMModuleRef {
+    pub(crate) unsafe fn as_ptr(&self) -> LLVMModuleRef {
         self.module_ref
     }
 

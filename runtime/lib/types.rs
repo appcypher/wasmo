@@ -1,4 +1,3 @@
-
 use serde::{Deserialize, Serialize};
 
 /// WebAssembly function type as defined in the spec.
@@ -7,7 +6,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FuncType {
     pub params: Vec<ValType>,
-    pub returns: Vec<ValType>,
+    pub results: Vec<ValType>,
 }
 
 /// WebAssembly value types as defined in the spec.
@@ -15,9 +14,9 @@ pub struct FuncType {
 /// https://webassembly.github.io/spec/core/syntax/types.html#syntax-valtype
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ValType {
-    NumType(NumType), // i32, i64, f32, f64
-    RefType(RefType), // funcref, externref
-    VecType,          // v128
+    Num(NumType), // i32, i64, f32, f64
+    Ref(RefType), // funcref, externref
+    Vec,          // v128
 }
 
 /// WebAssembly num types as defined in the spec.

@@ -18,3 +18,13 @@ In this order.
 2. Single-pass compilation.
 3. Serializable.
 4. Progressive optimisation.
+
+### Getting Started
+
+### Building Project
+
+- Build Project
+
+```sh
+LLVM_SYS_130_PREFIX=/usr/local/Cellar/llvm/13.0.0_1 cargo run --example module
+```

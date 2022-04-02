@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use anyhow::Result;
 use llvm_sys::{
     core::{LLVMContextCreate, LLVMContextDispose},
@@ -8,7 +6,7 @@ use llvm_sys::{
 
 use super::{
     module::LLModule,
-    types::{LLFunctionType, LLType, LLTypeKind},
+    types::{LLFunctionType, LLNumType, LLNumTypeKind, LLResultType, LLStructType, LLVoidType},
 };
 
 /// This a wrapper for LLVM Context.
@@ -31,32 +29,44 @@ impl LLContext {
         LLModule::new(name, self)
     }
 
-    pub(crate) fn as_ptr(&self) -> LLVMContextRef {
+    pub(crate) unsafe fn as_ptr(&self) -> LLVMContextRef {
         self.context_ref
     }
 
-    pub(crate) fn i64_type(&self) -> LLType {
-        LLType::new(self, LLTypeKind::I64)
+    pub(crate) fn i32_type(&self) -> LLNumType {
+        LLNumType::new(self, LLNumTypeKind::I32)
     }
 
-    pub(crate) fn i32_type(&self) -> LLType {
-        LLType::new(self, LLTypeKind::I32)
+    pub(crate) fn i64_type(&self) -> LLNumType {
+        LLNumType::new(self, LLNumTypeKind::I64)
     }
 
-    pub(crate) fn f64_type(&self) -> LLType {
-        LLType::new(self, LLTypeKind::F64)
+    pub(crate) fn i128_type(&self) -> LLNumType {
+        LLNumType::new(self, LLNumTypeKind::I128)
     }
 
-    pub(crate) fn f32_type(&self) -> LLType {
-        LLType::new(self, LLTypeKind::F32)
+    pub(crate) fn f32_type(&self) -> LLNumType {
+        LLNumType::new(self, LLNumTypeKind::F32)
+    }
+
+    pub(crate) fn f64_type(&self) -> LLNumType {
+        LLNumType::new(self, LLNumTypeKind::F64)
+    }
+
+    pub(crate) fn void_type(&self) -> LLVoidType {
+        LLVoidType::new(self)
+    }
+
+    pub(crate) fn struct_type(&self, types: &[LLNumType], is_packed: bool) -> LLStructType {
+        LLStructType::new(types, is_packed)
     }
 
     pub(crate) fn function_type(
         &self,
-        params: &[LLType],
-        result: &LLType,
+        params: &[LLNumType],
+        result: &LLResultType,
         is_varargs: bool,
-    ) -> Rc<LLFunctionType> {
+    ) -> LLFunctionType {
         LLFunctionType::new(params, result, is_varargs)
     }
 }

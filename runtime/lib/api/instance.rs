@@ -15,7 +15,7 @@ pub struct Instance<'a> {
 impl<'a> Instance<'a> {
     /// Creates a WebAssembly instance.
     pub fn new(module: &'a Module, imports: &Imports) -> Result<Self> {
-        module.initialize(imports)
+        module.initialize(imports, Default::default())
     }
 
     /// Invokes the function with the given name.

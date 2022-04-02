@@ -18,6 +18,7 @@ use super::{module::LLModule, types::LLFunctionType};
 ///
 /// - https://llvm.org/doxygen/Function_8cpp_source.html#l00409
 /// - https://llvm.org/doxygen/Function_8cpp_source.html#l00509
+#[derive(Debug)]
 pub(crate) struct LLFunction {
     function_ref: LLVMValueRef,
     function_type: Rc<LLFunctionType>,
@@ -35,12 +36,15 @@ impl LLFunction {
     /// - https://llvm.org/doxygen/Twine_8h_source.html#l00477
     /// - https://llvm.org/doxygen/Value_8cpp_source.html#l00315
     /// - https://llvm.org/doxygen/StringRef_8h_source.html#l00107
+    ///
+    /// A function is owned by a module but we also need to mutate function and since we cannot create a function without its module,
+    /// We decided to create an `Rc` of the function that can be shared. This simplifies what would have turned out tbe a lifetime hell.
     pub(crate) fn new(
         name: &str,
-        module: &LLModule,
+        module: &mut LLModule,
         function_type: Rc<LLFunctionType>,
-    ) -> Result<Self> {
-        Ok(Self {
+    ) -> Result<Rc<Self>> {
+        let function = Rc::new(Self {
             function_ref: unsafe {
                 LLVMAddFunction(
                     module.as_ptr(),
@@ -49,6 +53,10 @@ impl LLFunction {
                 )
             },
             function_type,
-        })
+        });
+
+        module.add_function(Rc::clone(&function));
+
+        Ok(function)
     }
 }

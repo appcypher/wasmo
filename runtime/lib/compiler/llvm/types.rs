@@ -1,105 +1,188 @@
-
-use std::rc::Rc;
-
 use llvm_sys::{
     core::{
-        LLVMDoubleTypeInContext, LLVMFloatTypeInContext, LLVMFunctionType, LLVMInt32TypeInContext,
-        LLVMInt64TypeInContext,
+        LLVMDoubleTypeInContext, LLVMFloatTypeInContext, LLVMFunctionType, LLVMInt128TypeInContext,
+        LLVMInt32TypeInContext, LLVMInt64TypeInContext, LLVMStructType, LLVMVoidTypeInContext,
     },
     prelude::LLVMTypeRef,
 };
 
 use super::context::LLContext;
 
-pub(crate) enum LLTypeKind {
-    I64,
+/// This is based on wasm num and vector types.
+pub(crate) enum LLNumTypeKind {
     I32,
-    F64,
+    I64,
+    I128,
     F32,
+    F64,
 }
 
-/// This is a wrapper for LLVM Type.
+/// Wrapper for LLVM number types (e.g. i64, f32) which is based on wasm num and vector types.
 ///
 /// # Safety
 /// Only a kind of each `LLVMTypeRef` is ever created. They are singletons and are never freed.
 ///
 /// - https://llvm.org/doxygen/classllvm_1_1Type.html#details
-pub(crate) struct LLType {
-    type_ref: LLVMTypeRef,
-    kind: LLTypeKind,
+/// - https://llvm.org/docs/LangRef.html#integer-type
+pub(crate) struct LLNumType(LLVMTypeRef);
+
+/// Wrapper for LLVM pointer types (e.g. i64*, [2 x double]*).
+///
+/// # Safety
+/// See [`LLNumType`](struct.LLNumType.html)
+///
+/// - https://llvm.org/docs/LangRef.html#pointer-type
+pub(crate) struct LLPointerType(LLVMTypeRef);
+
+/// Wrapper for LLVM vector types (e.g. <4 x i64>).
+///
+/// # Safety
+/// See [`LLNumType`](struct.LLNumType.html)
+///
+/// - https://llvm.org/docs/LangRef.html#vector-type
+pub(crate) struct LLVectorType(LLVMTypeRef);
+
+/// Wrapper for LLVM array type (e.g. [4 x double]).
+///
+/// # Safety
+/// See [`LLNumType`](struct.LLNumType.html)
+///
+/// - https://llvm.org/docs/LangRef.html#array-type
+pub(crate) struct LLArrayType(LLVMTypeRef);
+
+/// Wrapper for LLVM void type.
+///
+/// # Safety
+/// See [`LLNumType`](struct.LLNumType.html)
+///
+/// - https://llvm.org/docs/LangRef.html#void-type
+pub(crate) struct LLVoidType(LLVMTypeRef);
+
+/// Wrapper for LLVM struct type.
+///
+/// # Safety
+/// Structure types are a bit more complicated than scalar types because we need to allocate the array of types that gets passed to it.
+///
+/// The good thing however is that LLVM does not depend on our base pointer. It reallocates the params within the LLVM context.
+///
+/// - https://llvm.org/doxygen/Type_8cpp_source.html#l00361
+pub(crate) struct LLStructType(LLVMTypeRef);
+
+/// Wrapper for LLVM function type.
+///
+/// # Safety
+/// Function types are a bit more complicated than scalar types because we need to allocate the array of types that gets passed to it.
+///
+/// The good thing however is that LLVM does not depend on our base pointer. It reallocates the params within the LLVM context.
+///
+/// - https://llvm.org/doxygen/Type_8cpp_source.html#l00361
+#[derive(Debug)]
+pub(crate) struct LLFunctionType(LLVMTypeRef);
+
+/// A limited variants of types that can be returned by an LLVM function
+pub(crate) enum LLResultType {
+    Void(LLVoidType),
+    Num(LLNumType),
+    Struct(LLStructType),
 }
 
-impl LLType {
-    /// Creates a new LLVM type.
+impl LLNumType {
+    /// Creates an LLVM number type.
     ///
     /// # Safety
     /// LLContext does not own type here.
-    pub(crate) fn new(context: &LLContext, kind: LLTypeKind) -> Self {
-        use LLTypeKind::*;
-        let context_ref = context.as_ptr();
+    pub(crate) fn new(context: &LLContext, kind: LLNumTypeKind) -> Self {
+        use LLNumTypeKind::*;
+        let context_ref = unsafe { context.as_ptr() };
         let type_ref = unsafe {
             match kind {
-                I64 => LLVMInt64TypeInContext(context_ref),
                 I32 => LLVMInt32TypeInContext(context_ref),
-                F64 => LLVMDoubleTypeInContext(context_ref),
+                I64 => LLVMInt64TypeInContext(context_ref),
+                I128 => LLVMInt128TypeInContext(context_ref),
                 F32 => LLVMFloatTypeInContext(context_ref),
+                F64 => LLVMDoubleTypeInContext(context_ref),
             }
         };
 
-        Self { type_ref, kind }
+        Self(type_ref)
     }
 
-    pub(crate) fn as_ptr(&self) -> LLVMTypeRef {
-        self.type_ref
+    pub(crate) unsafe fn as_ptr(&self) -> LLVMTypeRef {
+        self.0
     }
 }
 
-/// This is a wrapper for LLVM Function Type.
-///
-/// # Safety
-/// As mentioned [here](struct.LLType.html), `LLVMTypeRef`s are singletons and never freed.
-/// However function types need pointers to some array of types as params and it is up to the owner of the array to free it.
-///
-/// This struct owns its params array and it is safe for params to hold pointers to non-function `LLVMTypeRef`s since they are never freed.
-///
-/// WARNING:
-/// It is unsafe to use the function reference because the params can be dropped when this struct goes out of scope.
-/// It is important to make sure the function is not dropped before the dependents.
-#[derive(Debug)]
-pub(crate) struct LLFunctionType {
-    params: Vec<LLVMTypeRef>,
-    result: LLVMTypeRef,
-    is_varargs: i32,
+impl LLVoidType {
+    /// Creates an LLVM void type.
+    ///
+    /// # Safety
+    /// See [`LLNumType`](struct.LLNumType.html)
+    pub(crate) fn new(context: &LLContext) -> Self {
+        Self(unsafe { LLVMVoidTypeInContext(context.as_ptr()) })
+    }
+
+    pub(crate) unsafe fn as_ptr(&self) -> LLVMTypeRef {
+        self.0
+    }
+}
+
+impl LLStructType {
+    /// Creates a new LLVM array type.
+    ///
+    /// # Safety
+    /// See [LLStructType](struct.LLStructType.html) for safety.
+    pub(crate) fn new(types: &[LLNumType], is_packed: bool) -> Self {
+        let types = types
+            .iter()
+            .map(|p| unsafe { p.as_ptr() })
+            .collect::<Vec<_>>();
+
+        Self(unsafe {
+            LLVMStructType(
+                types.as_ptr() as *mut LLVMTypeRef,
+                types.len() as u32,
+                is_packed as i32,
+            )
+        })
+    }
+
+    pub(super) unsafe fn as_ptr(&self) -> LLVMTypeRef {
+        self.0
+    }
 }
 
 impl LLFunctionType {
     /// Creates a new LLVM function type.
-    ///
     /// # Safety
     /// See [LLFunctionType](struct.LLFunctionType.html) for safety.
-    ///
-    /// `Rc` helps with safety here because dependents can rely on reference counting.
-    pub(crate) fn new(params: &[LLType], result: &LLType, is_varargs: bool) -> Rc<Self> {
-        Rc::new(Self {
-            params: params.iter().map(|p| p.as_ptr()).collect::<Vec<_>>(),
-            result: result.as_ptr(),
-            is_varargs: is_varargs as i32,
+    pub(crate) fn new(params: &[LLNumType], result: &LLResultType, is_varargs: bool) -> Self {
+        let params = params
+            .iter()
+            .map(|p| unsafe { p.as_ptr() })
+            .collect::<Vec<_>>();
+
+        Self(unsafe {
+            LLVMFunctionType(
+                result.as_ptr(),
+                params.as_ptr() as *mut LLVMTypeRef,
+                params.len() as u32,
+                is_varargs as i32,
+            )
         })
     }
 
-    /// Returns the pointer behind the function.
-    ///
-    /// # Safety
-    ///
-    /// WARNING:
-    /// It is unsafe to use the function reference because the params can be dropped when this struct goes out of scope.
-    /// It is important to make sure the function is not dropped before the dependents.
     pub(super) unsafe fn as_ptr(&self) -> LLVMTypeRef {
-        LLVMFunctionType(
-            self.result,
-            self.params.as_ptr() as *mut LLVMTypeRef,
-            self.params.len() as u32,
-            self.is_varargs,
-        )
+        self.0
+    }
+}
+
+impl LLResultType {
+    pub(crate) unsafe fn as_ptr(&self) -> LLVMTypeRef {
+        use LLResultType::*;
+        match self {
+            Void(v) => v.as_ptr(),
+            Num(n) => n.as_ptr(),
+            Struct(s) => s.as_ptr(),
+        }
     }
 }
