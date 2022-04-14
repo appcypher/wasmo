@@ -8,6 +8,10 @@ use llvm_sys::{
 
 use super::context::LLContext;
 
+//------------------------------------------------------------------------------
+// Type Definitions
+//------------------------------------------------------------------------------
+
 /// This is based on wasm num and vector types.
 pub(crate) enum LLNumTypeKind {
     I32,
@@ -85,6 +89,10 @@ pub(crate) enum LLResultType {
     Num(LLNumType),
     Struct(LLStructType),
 }
+
+//--------------------------------------------------------------------------------------------------
+// Implementations
+//--------------------------------------------------------------------------------------------------
 
 impl LLNumType {
     /// Creates an LLVM number type.

@@ -1,5 +1,5 @@
 [package]
-name = "wasmo_runtime"
+name = "wasmo-runtime"
 version = "0.1.0"
 edition = "2021"
 description = "The Wasmo Runtime"

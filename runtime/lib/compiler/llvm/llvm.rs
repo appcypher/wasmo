@@ -7,7 +7,7 @@ use llvm_sys::core::LLVMShutdown;
 /// Converts WebAssembly semantics to LLVM code and handles materialization.
 ///
 /// # Safety
-/// This type is self-referential. We can only construct it as a pinned object.
+/// This type is self-referential so we can only construct it as a pinned object.
 /// This prevents pointer issues that comes with moving the object.
 ///
 /// The codegen phase generates some boilerplate code that is used during initialization, and execution.
@@ -35,7 +35,6 @@ use llvm_sys::core::LLVMShutdown;
 /// - calling imported functions
 /// - calling indirect functions
 ///
-/// #### The Store Data Section
 /// #### The Store Data Section
 /// - `function_resolver -> func_addr` // resolves intrinsics and imported functions
 /// - `intrinsics -> (length, func_addr*)` // intrinsic function fixup
