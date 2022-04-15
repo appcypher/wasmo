@@ -1,29 +1,31 @@
 use std::pin::Pin;
 
-use serde::{Deserialize, Serialize};
-
 use anyhow::Result;
+use llvm::LLVM;
 use log::debug;
+use serde::{Deserialize, Serialize};
 use wasmparser::{
     DataSectionReader, ElementSectionReader, ExportSectionReader, FunctionBody,
     FunctionSectionReader, GlobalSectionReader, ImportSectionEntryType, ImportSectionReader,
     MemorySectionReader, Parser, Payload, TableSectionReader, TypeDef, TypeSectionReader,
 };
 
+use super::{
+    exports::{Export, Exports},
+    imports::{Import, Imports},
+    utils::convert,
+    value::Value,
+    Data, Element, Function, Global, Memory, Table,
+};
 use crate::{
     compiler::exports::ExportKind,
     errors::CompilerError,
     types::{FuncType, Limits},
 };
 
-use super::{
-    exports::{Export, Exports},
-    imports::{Import, Imports},
-    llvm::LLVM,
-    utils::convert,
-    value::Value,
-    Data, Element, Function, Global, Memory, Table,
-};
+//--------------------------------------------------------------------------------------------------
+// Type Definitions
+//--------------------------------------------------------------------------------------------------
 
 /// The compiler is responsible for compiling a module.
 #[derive(Debug, Serialize, Deserialize, Default)]
@@ -73,6 +75,10 @@ pub struct FunctionFrame {
     /// An implicit stack only needed during compilation.
     pub stack: Vec<Value>,
 }
+
+//--------------------------------------------------------------------------------------------------
+// Implementations
+//--------------------------------------------------------------------------------------------------
 
 impl Compiler {
     /// Creates a new `Compiler` with the given options.
@@ -142,7 +148,7 @@ impl Compiler {
                 }
                 Payload::CodeSectionEntry(body) => {
                     debug!("======= CodeSectionEntry =======");
-                    self.compile_function_body(body)?;
+                    self.compile_function_body(body, &mut llvm)?;
                 }
                 Payload::ModuleSectionStart { .. } => {
                     debug!("======= ModuleSectionStart =======");
@@ -155,6 +161,8 @@ impl Compiler {
                 }
                 Payload::End => {
                     debug!("======= End =======");
+                    // TODO(appcypher): Generate misc LLVM code here. (self.oompile_post())
+                    // - data section fixup alloc
                 }
                 t => {
                     return Err(CompilerError::UnsupportedSection(format!("{:?}", t)).into());
@@ -173,7 +181,11 @@ impl Compiler {
 
 impl Compiler {
     /// Compiles function types in type section.
-    pub(crate) fn compile_types(&mut self, reader: TypeSectionReader, llvm: &mut LLVM) -> Result<()> {
+    pub(crate) fn compile_types(
+        &mut self,
+        reader: TypeSectionReader,
+        llvm: &mut LLVM,
+    ) -> Result<()> {
         for result in reader.into_iter() {
             let typedef = result?;
 
@@ -183,7 +195,7 @@ impl Compiler {
                 TypeDef::Func(ty) => {
                     let wasmo_func_ty = convert::to_wasmo_functype(&ty)?;
                     let llvm_func_ty = convert::to_llvm_functype(&llvm.context, &wasmo_func_ty);
-                    // TODO(appcypher): Store llvm func type in llvm.types.
+                    llvm.info.types.push(llvm_func_ty);
                     self.info.types.push(wasmo_func_ty);
                 }
                 t => {
@@ -204,6 +216,8 @@ impl Compiler {
 
             debug!("import: {:?}", import);
 
+            // TODO(appcypher): Generate LLVM code for imports.
+            // - generate `resolve_imported_*` functions.
             match import.ty {
                 ImportSectionEntryType::Function(index) => {
                     self.info.imports.functions.push(Import::new(
@@ -412,8 +426,13 @@ impl Compiler {
     }
 
     /// Compiles function body.
-    pub fn compile_function_body(&mut self, body: FunctionBody) -> Result<()> {
+    pub fn compile_function_body(&mut self, body: FunctionBody, llvm: &mut LLVM) -> Result<()> {
         debug!("function body: {:?}", body);
+
+        // let index = 0usize;
+        // let mut llvm_func_type = llvm.info.types[index];
+        // let mut llvm_module = llvm.module.as_mut().unwrap();
+        // let mut llvm_func = LLFunction::new("???", llvm_module, llvm_func_type);
 
         body.get_locals_reader().into_iter().for_each(|r| {
             r.into_iter().for_each(|i| {

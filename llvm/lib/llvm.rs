@@ -46,21 +46,21 @@ use llvm_sys::core::LLVMShutdown;
 /// #### Misc
 /// - loading important values like memory address into registers from the store data section
 #[derive(Debug)]
-pub(crate) struct LLVM {
-    pub(crate) context: LLContext,
-    pub(crate) module: Option<LLModule>,
-    pub(crate) info: LLVMInfo,
+pub struct LLVM {
+    pub context: LLContext,
+    pub module: Option<LLModule>,
+    pub info: LLVMInfo,
 }
 
 /// Compilation information about an LLVM Module.
 #[derive(Debug, Default)]
-pub(crate) struct LLVMInfo {
-    types: Vec<LLFunctionType>,
+pub struct LLVMInfo {
+    pub types: Vec<LLFunctionType>,
 }
 
 impl LLVM {
     /// Creates pinned LLVM instance.
-    pub(crate) fn new() -> Result<Pin<Box<Self>>> {
+    pub fn new() -> Result<Pin<Box<Self>>> {
         // TODO(appcypher): Initialize target, asm printer.
 
         let mut this = Box::pin(Self {
@@ -70,7 +70,7 @@ impl LLVM {
         });
 
         // The module field references the context field so this is self-referential.
-        this.module = Some(LLModule::new("initial", &this.context)?);
+        this.module = Some(this.context.create_module("initial")?);
 
         Ok(this)
     }

@@ -1,5 +1,5 @@
 use super::Store;
-use crate::compiler::value::Value;
+use crate::compiler::Value;
 use crate::{Imports, Module};
 use anyhow::Result;
 

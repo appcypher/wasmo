@@ -5,11 +5,10 @@ mod exports;
 mod function;
 mod global;
 mod imports;
-mod llvm;
 mod memory;
 mod table;
 mod utils;
-pub(crate) mod value;
+mod value;
 
 pub use compiler::*;
 pub use data::*;
@@ -18,3 +17,4 @@ pub use function::*;
 pub use global::*;
 pub use memory::*;
 pub use table::*;
+pub use value::*;

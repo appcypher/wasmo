@@ -9,6 +9,7 @@ repository = "https://github.com/appcypher/wasmo"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+llvm = { package = "wasmo-llvm", path = "../llvm" }
 anyhow = "1.0"
 wasmparser = "0.82.0"
 env_logger = "0.9.0"
@@ -16,8 +17,7 @@ wat = "1.0.41"
 serde = { version = "1.0", features = ["derive"] }
 bincode = "1.3.3"
 bytecheck = "0.6.7"
-llvm-sys = "130.0"
 log = "0.4.14"
 
 [lib]
-path = "lib/lib.rs"
+path = "lib.rs"

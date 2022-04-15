@@ -407,6 +407,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "wasmo-llvm"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "llvm-sys",
+]
+
+[[package]]
 name = "wasmo-runtime"
 version = "0.1.0"
 dependencies = [
@@ -414,9 +422,9 @@ dependencies = [
  "bincode",
  "bytecheck",
  "env_logger",
- "llvm-sys",
  "log",
  "serde",
+ "wasmo-llvm",
  "wasmparser",
  "wat",
 ]

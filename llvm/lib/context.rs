@@ -9,59 +9,58 @@ use super::{
     types::{LLFunctionType, LLNumType, LLNumTypeKind, LLResultType, LLStructType, LLVoidType},
 };
 
-/// This a wrapper for LLVM Context.
+/// LLVM Context wrapper.
 ///
 /// # Ownership
-/// Owns the LLVM Module.
+/// - Owns the LLVM Module.
+///
+/// ### References
+/// - https://llvm.org/doxygen/Module_8cpp_source.html#l00079
 #[derive(Debug)]
-pub(crate) struct LLContext {
-    context_ref: LLVMContextRef,
-}
+pub struct LLContext(LLVMContextRef);
 
 impl LLContext {
-    pub(crate) fn new() -> Self {
-        Self {
-            context_ref: unsafe { LLVMContextCreate() },
-        }
+    pub fn new() -> Self {
+        Self(unsafe { LLVMContextCreate() })
     }
 
-    pub(crate) fn create_module(&self, name: &str) -> Result<LLModule> {
+    pub fn create_module(&self, name: &str) -> Result<LLModule> {
         LLModule::new(name, self)
     }
 
     pub(crate) unsafe fn as_ptr(&self) -> LLVMContextRef {
-        self.context_ref
+        self.0
     }
 
-    pub(crate) fn i32_type(&self) -> LLNumType {
+    pub fn i32_type(&self) -> LLNumType {
         LLNumType::new(self, LLNumTypeKind::I32)
     }
 
-    pub(crate) fn i64_type(&self) -> LLNumType {
+    pub fn i64_type(&self) -> LLNumType {
         LLNumType::new(self, LLNumTypeKind::I64)
     }
 
-    pub(crate) fn i128_type(&self) -> LLNumType {
+    pub fn i128_type(&self) -> LLNumType {
         LLNumType::new(self, LLNumTypeKind::I128)
     }
 
-    pub(crate) fn f32_type(&self) -> LLNumType {
+    pub fn f32_type(&self) -> LLNumType {
         LLNumType::new(self, LLNumTypeKind::F32)
     }
 
-    pub(crate) fn f64_type(&self) -> LLNumType {
+    pub fn f64_type(&self) -> LLNumType {
         LLNumType::new(self, LLNumTypeKind::F64)
     }
 
-    pub(crate) fn void_type(&self) -> LLVoidType {
+    pub fn void_type(&self) -> LLVoidType {
         LLVoidType::new(self)
     }
 
-    pub(crate) fn struct_type(&self, types: &[LLNumType], is_packed: bool) -> LLStructType {
+    pub fn struct_type(&self, types: &[LLNumType], is_packed: bool) -> LLStructType {
         LLStructType::new(types, is_packed)
     }
 
-    pub(crate) fn function_type(
+    pub fn function_type(
         &self,
         params: &[LLNumType],
         result: &LLResultType,
@@ -71,11 +70,17 @@ impl LLContext {
     }
 }
 
+impl Default for LLContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for LLContext {
     fn drop(&mut self) {
         // Dispose of the LLVM context.
         unsafe {
-            LLVMContextDispose(self.context_ref);
+            LLVMContextDispose(self.0);
         }
     }
 }

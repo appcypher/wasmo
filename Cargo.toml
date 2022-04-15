@@ -1,6 +1,7 @@
 [workspace]
 members = [
 	'cli',
+	'llvm',
 	'runtime',
 	'tests'
 ]

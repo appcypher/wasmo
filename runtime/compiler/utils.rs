@@ -1,16 +1,15 @@
 pub mod convert {
+    use anyhow::Result;
+    use llvm::{
+        context::LLContext,
+        types::{LLFunctionType, LLNumType, LLResultType},
+    };
+
     use crate::{
-        compiler::{
-            llvm::{
-                context::LLContext,
-                types::{LLFunctionType, LLNumType, LLResultType},
-            },
-            DataKind, ElementKind,
-        },
+        compiler::{DataKind, ElementKind},
         errors::CompilerError,
         types::{FuncType, NumType, RefType, ValType},
     };
-    use anyhow::Result;
 
     /// Converts `wasmparser` `FuncType` to `wasmo` `FuncType`.
     pub fn to_wasmo_functype(ty: &wasmparser::FuncType) -> Result<FuncType> {
