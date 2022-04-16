@@ -7,6 +7,8 @@ use llvm_sys::{
     prelude::LLVMModuleRef,
 };
 
+use crate::{values::LLFunction, types::LLFunctionType};
+
 use super::context::LLContext;
 
 /// LLVM Module wrapper.
@@ -23,11 +25,12 @@ use super::context::LLContext;
 /// - https://llvm.org/doxygen/LLVMContextImpl_8cpp_source.html#l00052
 ///
 /// # Ownership
-/// - Owned by LLVM Context.
+/// - Owned by an LLVM Context.
 /// - Owns the functions and globals added to it.
 ///
 /// ### References
 /// - https://llvm.org/doxygen/Module_8cpp_source.html#l00079
+/// - https://llvm.org/doxygen/LLVMContextImpl_8cpp_source.html#l00056
 #[derive(Debug)]
 pub struct LLModule(LLVMModuleRef);
 
@@ -47,6 +50,14 @@ impl LLModule {
         Ok(Self(unsafe {
             LLVMModuleCreateWithNameInContext(CString::new(name)?.as_ptr(), context.as_ptr())
         }))
+    }
+
+    pub fn add_function(
+        &mut self,
+        name: &str,
+        function_type: &LLFunctionType,
+    ) -> Result<LLFunction> {
+        LLFunction::new(name, self, function_type)
     }
 
     pub(crate) unsafe fn as_ptr(&self) -> LLVMModuleRef {

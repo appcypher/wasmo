@@ -2,7 +2,7 @@ mod api;
 mod compiler;
 mod context;
 mod errors;
-mod intrinsics;
+mod builtins;
 mod types;
 
 pub use api::*;

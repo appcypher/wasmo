@@ -13,9 +13,11 @@ use super::{
 ///
 /// # Ownership
 /// - Owns the LLVM Module.
+/// - Not owned by anything.
 ///
 /// ### References
 /// - https://llvm.org/doxygen/Module_8cpp_source.html#l00079
+/// - https://llvm.org/doxygen/LLVMContextImpl_8cpp_source.html#l00056
 #[derive(Debug)]
 pub struct LLContext(LLVMContextRef);
 

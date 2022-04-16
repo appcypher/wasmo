@@ -8,6 +8,7 @@ pub enum CompilerError {
     UnsupportedWasmoValType(String),
     UnsupportedMemory64Proposal,
     UnsupportedSection(String),
+    UnsupportedInstruction(String),
 }
 
 impl std::error::Error for CompilerError {}

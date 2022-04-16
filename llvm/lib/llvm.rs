@@ -15,17 +15,17 @@ use llvm_sys::core::LLVMShutdown;
 ///
 /// #### The Resolvers Functions
 /// - `add_function_resolver(resolver_addr)` // save address to designated data section
-/// - `resolve_imported_memories(store_ref_addr)` // call intrinsics, save address to designated data section
-/// - `resolve_imported_tables(store_ref_addr)` // call intrinsics, save address to designated data section
-/// - `resolve_imported_globals(store_ref_addr)` // call intrinsics, save address to designated data section
+/// - `resolve_imported_memories(store_ref_addr)` // call builtins, save address to designated data section
+/// - `resolve_imported_tables(store_ref_addr)` // call builtins, save address to designated data section
+/// - `resolve_imported_globals(store_ref_addr)` // call builtins, save address to designated data section
 ///
 /// #### The Local Setup Functions
-/// - `setup_local_memories(store_ref_addr)` // call intrinsics, call initializers, save address to designated data section
-/// - `setup_local_tables(store_ref_addr)` // call intrinsics, call initializers, save address to designated data section
-/// - `setup_local_globals(store_ref_addr)` // call intrinsics, call initializers, save content to designated data section
+/// - `setup_local_memories(store_ref_addr)` // call builtins, call initializers, save address to designated data section
+/// - `setup_local_tables(store_ref_addr)` // call builtins, call initializers, save address to designated data section
+/// - `setup_local_globals(store_ref_addr)` // call builtins, call initializers, save content to designated data section
 ///
 /// #### The Initializer Functions
-/// - `initialize_mem_0_data_0(store_ref_addr)` // call intrinsics, save content to designated data section
+/// - `initialize_mem_0_data_0(store_ref_addr)` // call builtins, save content to designated data section
 /// - ...
 ///
 /// #### The Start Function
@@ -36,8 +36,8 @@ use llvm_sys::core::LLVMShutdown;
 /// - calling indirect functions
 ///
 /// #### The Store Data Section
-/// - `function_resolver -> func_addr` // resolves intrinsics and imported functions
-/// - `intrinsics -> (length, func_addr*)` // intrinsic function fixup
+/// - `function_resolver -> func_addr` // resolves builtins and imported functions
+/// - `builtins -> (length, func_addr*)` // builtin function fixup
 /// - `functions -> (length, (type, func_addr)*)` // imported fn fixup and indirect calls
 /// - `memories -> (length, memory_base_addr*)` // memory base address fixup
 /// - `tables -> (length, table_base_addr*)` // table base address fixup
