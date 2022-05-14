@@ -3,8 +3,9 @@ use std::ffi::CString;
 use anyhow::Result;
 use llvm_sys::{
     core::{
-        LLVMBuildAlloca, LLVMBuildStore, LLVMCreateBuilderInContext, LLVMDisposeBuilder,
-        LLVMPositionBuilderAtEnd, LLVMBuildUnreachable,
+        LLVMBuildAlloca, LLVMBuildBr, LLVMBuildCondBr, LLVMBuildRet, LLVMBuildRetVoid,
+        LLVMBuildStore, LLVMBuildUnreachable, LLVMCreateBuilderInContext, LLVMDisposeBuilder,
+        LLVMPositionBuilderAtEnd,
     },
     prelude::LLVMBuilderRef,
 };
@@ -13,7 +14,7 @@ use crate::{
     basic_block::LLBasicBlock,
     context::LLContext,
     types::LLNumType,
-    values::{LLAlloca, LLStore, LLValue},
+    values::{LLAlloca, LLBr, LLCondBr, LLRet, LLRetVoid, LLStore, LLUnreachable, LLValue},
 };
 
 /// LLVM Builder wrapper.
@@ -48,8 +49,40 @@ impl LLBuilder {
     }
 
     /// Creates a new LLVM Unreachable instruction.
-    pub fn build_unreachable(&mut self) {
-        unsafe { LLVMBuildUnreachable(self.0) };
+    pub fn build_unreachable(&mut self) -> LLUnreachable {
+        LLUnreachable::from_ptr(unsafe { LLVMBuildUnreachable(self.0) })
+    }
+
+    /// Creates a new LLVM Ret instruction.
+    pub fn build_ret(&mut self, value: &impl LLValue) -> LLRet {
+        LLRet::from_ptr(unsafe { LLVMBuildRet(self.0, value.value_ref()) })
+    }
+
+    /// Creates a new LLVM Ret Void instruction.
+    pub fn build_ret_void(&mut self) -> LLRetVoid {
+        LLRetVoid::from_ptr(unsafe { LLVMBuildRetVoid(self.0) })
+    }
+
+    /// Creates a new LLVM Br instruction.
+    pub fn build_br(&mut self, basic_block: &LLBasicBlock) -> LLBr {
+        LLBr::from_ptr(unsafe { LLVMBuildBr(self.0, basic_block.as_ptr()) })
+    }
+
+    /// Creates a new LLVM BrIf instruction.
+    pub fn build_cond_br(
+        &mut self,
+        cond: &dyn LLValue,
+        then_block: &LLBasicBlock,
+        else_block: &LLBasicBlock,
+    ) -> LLCondBr {
+        LLCondBr::from_ptr(unsafe {
+            LLVMBuildCondBr(
+                self.0,
+                cond.value_ref(),
+                then_block.as_ptr(),
+                else_block.as_ptr(),
+            )
+        })
     }
 
     pub(crate) unsafe fn as_ptr(&self) -> LLVMBuilderRef {

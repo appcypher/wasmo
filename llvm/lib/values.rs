@@ -41,15 +41,40 @@ pub struct LLFunction(LLVMValueRef);
 /// TODO(appcypher): Add note on safety and ownership.
 pub struct LLParam(LLVMValueRef);
 
-/// A wrapper for LLVM store instruction.
+/// A wrapper for LLVM `store` instruction.
 ///
 /// TODO(appcypher): Add note on safety and ownership.
 pub struct LLStore(LLVMValueRef);
 
-/// A wrapper for LLVM alloca instruction.
+/// A wrapper for LLVM `ret` instruction.
+///
+/// TODO(appcypher): Add note on safety and ownership.
+pub struct LLUnreachable(LLVMValueRef);
+
+/// A wrapper for LLVM `alloca` instruction.
 ///
 /// TODO(appcypher): Add note on safety and ownership.
 pub struct LLAlloca(LLVMValueRef);
+
+/// A wrapper for LLVM `ret` instruction.
+///
+/// TODO(appcypher): Add note on safety and ownership.
+pub struct LLRet(LLVMValueRef);
+
+/// A wrapper for LLVM `ret void` instruction.
+///
+/// TODO(appcypher): Add note on safety and ownership.
+pub struct LLRetVoid(LLVMValueRef);
+
+/// A wrapper for LLVM `br` instruction.
+///
+/// TODO(appcypher): Add note on safety and ownership.
+pub struct LLBr(LLVMValueRef);
+
+/// A wrapper for LLVM CondBr instruction.
+///
+/// TODO(appcypher): Add note on safety and ownership.
+pub struct LLCondBr(LLVMValueRef);
 
 //------------------------------------------------------------------------------
 // Implementations
@@ -99,59 +124,37 @@ impl LLFunction {
     }
 }
 
-impl LLParam {
-    /// Creates a new LLVM Param from a raw pointer.
-    pub(super) fn from_ptr(ptr: LLVMValueRef) -> Self {
-        Self(ptr)
-    }
-
-    pub(crate) unsafe fn as_ptr(&self) -> LLVMValueRef {
-        self.0
-    }
-}
-
-impl LLStore {
-    /// Creates a new LLVM Store instruction from a raw pointer.
-    pub(super) fn from_ptr(ptr: LLVMValueRef) -> Self {
-        Self(ptr)
-    }
-
-    pub(crate) unsafe fn as_ptr(&self) -> LLVMValueRef {
-        self.0
-    }
-}
-
-impl LLAlloca {
-    /// Creates a new LLVM Alloca instruction from a raw pointer.
-    pub(super) fn from_ptr(ptr: LLVMValueRef) -> Self {
-        Self(ptr)
-    }
-
-    pub(crate) unsafe fn as_ptr(&self) -> LLVMValueRef {
-        self.0
-    }
-}
-
 impl LLValue for LLFunction {
     unsafe fn value_ref(&self) -> LLVMValueRef {
         self.0
     }
 }
 
-impl LLValue for LLParam {
-    unsafe fn value_ref(&self) -> LLVMValueRef {
-        self.0
-    }
+macro_rules! impl_value {
+    ($t:ty) => {
+        impl $t {
+            pub(super) fn from_ptr(ptr: LLVMValueRef) -> Self {
+                Self(ptr)
+            }
+
+            pub(crate) unsafe fn as_ptr(&self) -> LLVMValueRef {
+                self.0
+            }
+        }
+
+        impl LLValue for $t {
+            unsafe fn value_ref(&self) -> LLVMValueRef {
+                self.0
+            }
+        }
+    };
 }
 
-impl LLValue for LLStore {
-    unsafe fn value_ref(&self) -> LLVMValueRef {
-        self.0
-    }
-}
-
-impl LLValue for LLAlloca {
-    unsafe fn value_ref(&self) -> LLVMValueRef {
-        self.0
-    }
-}
+impl_value!(LLParam);
+impl_value!(LLUnreachable);
+impl_value!(LLAlloca);
+impl_value!(LLStore);
+impl_value!(LLRet);
+impl_value!(LLRetVoid);
+impl_value!(LLBr);
+impl_value!(LLCondBr);

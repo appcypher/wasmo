@@ -2,7 +2,13 @@ use std::pin::Pin;
 
 use anyhow::Result;
 use hashbrown::HashMap;
-use llvm::{builder::LLBuilder, values::LLFunction, LLVM};
+use llvm::{
+    basic_block::LLBasicBlock,
+    builder::LLBuilder,
+    types::{LLNumType, LLNumTypeKind},
+    values::{LLFunction, LLValue},
+    LLVM,
+};
 use log::debug;
 use serde::{Deserialize, Serialize};
 use wasmparser::{
@@ -61,19 +67,25 @@ pub struct ModuleInfo {
     pub elements: Vec<Element>,
     /// An ordered list of data from the data section.
     pub data: Vec<Data>,
-    /// Represents the current function being compiled.
-    pub current_frame: Option<FunctionFrame>,
     /// The start function.
     pub start_function: Option<u32>,
 }
 
-/// Represents the current function being compiled.
-#[derive(Debug, Serialize, Deserialize, Default)]
-pub struct FunctionFrame {
-    /// Local variables.
-    pub locals: Vec<Value>,
-    /// An implicit stack only needed during compilation.
-    pub stack: Vec<Value>,
+/// TODO(appcypher): Document this.
+pub enum Block {
+    If {
+        then: LLBasicBlock,
+        r#else: Option<LLBasicBlock>,
+        cont: Option<LLBasicBlock>,
+    },
+    Loop {
+        main: LLBasicBlock,
+        cont: Option<LLBasicBlock>,
+    },
+    Block {
+        main: LLBasicBlock,
+        cont: Option<LLBasicBlock>,
+    },
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -456,7 +468,7 @@ impl Compiler {
         let llvm_module = llvm.module.as_mut().unwrap();
         let llvm_func = llvm_module.add_function(&format!("func_{body_index}"), llvm_func_type)?;
 
-        // Create basic block.
+        // Create entry basic block.
         let llvm_context = &llvm.context;
         let llvm_entry_bb = llvm_func.create_basic_block("entry", llvm_context)?;
 
@@ -464,7 +476,7 @@ impl Compiler {
         let mut llvm_builder = LLBuilder::new(llvm_context);
         llvm_builder.position_at_end(&llvm_entry_bb);
 
-        // Locals.
+        // Build locals.
         let mut llvm_locals = HashMap::new();
         for r in body.get_locals_reader().into_iter() {
             for local in r.into_iter() {
@@ -486,11 +498,13 @@ impl Compiler {
         let _body_local_offset = self.info.types[type_index as usize].params.len();
 
         // The stacks.
-        let mut block_stack = vec![llvm_entry_bb];
+        let mut block_stack: Vec<Block> = vec![];
+        let mut implicit_stack: Vec<Box<dyn LLValue>> = vec![];
 
         // Operators.
         for r in body.get_operators_reader().into_iter() {
             for operator in r.into_iter() {
+                let block_count = block_stack.len();
                 match operator? {
                     Operator::Unreachable => {
                         llvm_builder.build_unreachable();
@@ -499,16 +513,52 @@ impl Compiler {
                         llvm_builder.build_unreachable();
                     }
                     Operator::Block { ty } => {
-                        let llvm_block = llvm_func.create_basic_block(
-                            &format!("block_{}", block_stack.len()),
+                        let llvm_bb = llvm_func.create_basic_block(& format!("block_{}", block_count), llvm_context)?;
+
+                        block_stack.push(Block::Block {
+                            main: llvm_bb,
+                            cont: None,
+                        });
+                    }
+                    Operator::Loop { ty } => {
+                        let llvm_bb = llvm_func.create_basic_block(& format!("loop_{}", block_count), llvm_context)?;
+
+                        block_stack.push(Block::Loop {
+                            main: llvm_bb,
+                            cont: None,
+                        });
+                    }
+                    Operator::If { ty } => {
+                        let llvm_then_bb = llvm_func.create_basic_block(
+                            &format!("if_then_{}", block_count),
                             llvm_context,
                         )?;
-                        llvm_builder.build_unreachable();
-                        block_stack.push(llvm_block);
+
+                        let llvm_else_bb = llvm_func.create_basic_block(
+                            &format!("if_else_{}", block_count),
+                            llvm_context,
+                        )?;
+
+                        // Add conditional branching instruction.
+                        let stack_value = implicit_stack.pop().unwrap();
+                        llvm_builder.build_cond_br(stack_value.as_ref(), &llvm_then_bb, &llvm_else_bb);
+
+                        block_stack.push(Block::If {
+                            then: llvm_then_bb,
+                            r#else: Some(llvm_else_bb),
+                            cont: None,
+                        });
                     }
-                    // Operator::Loop { ty } => todo!(),
-                    // Operator::If { ty } => todo!(),
-                    // Operator::Else => todo!(),
+                    Operator::Else => {
+                        let llvm_cont_bb = llvm_func.create_basic_block(
+                            &format!("if_cont_{}", block_count),
+                            llvm_context,
+                        )?;
+
+                        if let Block::If { ref mut cont, .. } = block_stack.last_mut().unwrap() {
+                            *cont = Some(llvm_cont_bb)
+                        };
+                    }
                     // Operator::Try { ty } => todo!(),
                     // Operator::Catch { index } => todo!(),
                     // Operator::Throw { index } => todo!(),
@@ -1035,11 +1085,6 @@ impl Compiler {
                     // Operator::F32x4MaxRelaxed => todo!(),
                     // Operator::F64x2MinRelaxed => todo!(),
                     // Operator::F64x2MaxRelaxed => todo!(),
-                    // op => {
-                    //     return Err(
-                    //         CompilerError::UnsupportedInstruction(format!("{:?}", op)).into()
-                    //     )
-                    // }
                     _ => {}
                 }
             }

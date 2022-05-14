@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+/// TODO(appcypher): Document this.
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Value {
     Num(NumVal),
@@ -7,6 +8,7 @@ pub enum Value {
     Vec(i128),
 }
 
+/// TODO(appcypher): Document this.
 #[derive(Debug, Serialize, Deserialize)]
 pub enum NumVal {
     I32(i32),
@@ -15,6 +17,7 @@ pub enum NumVal {
     F64(f64),
 }
 
+/// TODO(appcypher): Document this.
 #[derive(Debug, Serialize, Deserialize)]
 pub enum RefVal {
     FuncAddr(i32),
