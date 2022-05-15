@@ -3,9 +3,9 @@ use std::ffi::CString;
 use anyhow::Result;
 use llvm_sys::{
     core::{
-        LLVMBuildAlloca, LLVMBuildBr, LLVMBuildCondBr, LLVMBuildRet, LLVMBuildRetVoid,
-        LLVMBuildStore, LLVMBuildUnreachable, LLVMCreateBuilderInContext, LLVMDisposeBuilder,
-        LLVMPositionBuilderAtEnd,
+        LLVMBuildAdd, LLVMBuildAlloca, LLVMBuildBr, LLVMBuildCondBr, LLVMBuildLoad, LLVMBuildRet,
+        LLVMBuildRetVoid, LLVMBuildStore, LLVMBuildSub, LLVMBuildUnreachable,
+        LLVMCreateBuilderInContext, LLVMDisposeBuilder, LLVMPositionBuilderAtEnd,
     },
     prelude::LLVMBuilderRef,
 };
@@ -14,7 +14,10 @@ use crate::{
     basic_block::LLBasicBlock,
     context::LLContext,
     types::LLNumType,
-    values::{LLAlloca, LLBr, LLCondBr, LLRet, LLRetVoid, LLStore, LLUnreachable, LLValue},
+    values::{
+        LLAdd, LLAlloca, LLBr, LLCondBr, LLLoad, LLRet, LLRetVoid, LLStore, LLSub, LLUnreachable,
+        LLValue,
+    },
 };
 
 /// LLVM Builder wrapper.
@@ -48,6 +51,13 @@ impl LLBuilder {
         LLStore::from_ptr(unsafe { LLVMBuildStore(self.0, alloca.as_ptr(), value.value_ref()) })
     }
 
+    /// Creates a new LLVM Load instruction.
+    pub fn build_load(&mut self, alloca: &LLAlloca, name: &str) -> Result<LLLoad> {
+        Ok(LLLoad::from_ptr(unsafe {
+            LLVMBuildLoad(self.0, alloca.as_ptr(), CString::new(name)?.as_ptr())
+        }))
+    }
+
     /// Creates a new LLVM Unreachable instruction.
     pub fn build_unreachable(&mut self) -> LLUnreachable {
         LLUnreachable::from_ptr(unsafe { LLVMBuildUnreachable(self.0) })
@@ -68,6 +78,30 @@ impl LLBuilder {
         LLBr::from_ptr(unsafe { LLVMBuildBr(self.0, basic_block.as_ptr()) })
     }
 
+    /// Creates a new LLVM add instruction.
+    pub fn build_add(&mut self, lhs: &dyn LLValue, rhs: &dyn LLValue, name: &str) -> Result<LLAdd> {
+        Ok(LLAdd::from_ptr(unsafe {
+            LLVMBuildAdd(
+                self.0,
+                lhs.value_ref(),
+                rhs.value_ref(),
+                CString::new(name)?.as_ptr(),
+            )
+        }))
+    }
+
+    /// Creates a new LLVM subtract instruction.
+    pub fn build_sub(&mut self, lhs: &dyn LLValue, rhs: &dyn LLValue, name: &str) -> Result<LLSub> {
+        Ok(LLSub::from_ptr(unsafe {
+            LLVMBuildSub(
+                self.0,
+                lhs.value_ref(),
+                rhs.value_ref(),
+                CString::new(name)?.as_ptr(),
+            )
+        }))
+    }
+
     /// Creates a new LLVM BrIf instruction.
     pub fn build_cond_br(
         &mut self,
@@ -85,6 +119,7 @@ impl LLBuilder {
         })
     }
 
+    #[allow(unused)]
     pub(crate) unsafe fn as_ptr(&self) -> LLVMBuilderRef {
         self.0
     }

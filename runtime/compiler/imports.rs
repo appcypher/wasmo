@@ -11,15 +11,15 @@ pub struct Imports {
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Import {
     pub module: String,
-    pub field: Option<String>,
+    pub name: String,
     pub index: u32,
 }
 
 impl Import {
-    pub fn new(module: String, field: Option<String>, index: u32) -> Self {
+    pub fn new(module: String, name: String, index: u32) -> Self {
         Self {
             module,
-            field,
+            name,
             index,
         }
     }

@@ -16,6 +16,10 @@ use super::{module::LLModule, types::LLFunctionType};
 
 /// For ypes that are LLVMValueRef.
 pub trait LLValue {
+    /// Returns the underlying LLVMValueRef of this value.
+    ///
+    /// # Safety
+    /// - Unsafe because it exposes a raw pointer gotten from LLVM ffi.
     unsafe fn value_ref(&self) -> LLVMValueRef;
 }
 
@@ -36,45 +40,45 @@ pub trait LLValue {
 #[derive(Debug)]
 pub struct LLFunction(LLVMValueRef);
 
-/// LLVM Param wrapper.
-///
-/// TODO(appcypher): Add note on safety and ownership.
-pub struct LLParam(LLVMValueRef);
+macro_rules! impl_value {
+    ($t:ident) => {
+        #[derive(Debug)]
+        pub struct $t(LLVMValueRef);
 
-/// A wrapper for LLVM `store` instruction.
-///
-/// TODO(appcypher): Add note on safety and ownership.
-pub struct LLStore(LLVMValueRef);
+        impl $t {
+            pub(super) fn from_ptr(ptr: LLVMValueRef) -> Self {
+                Self(ptr)
+            }
 
-/// A wrapper for LLVM `ret` instruction.
-///
-/// TODO(appcypher): Add note on safety and ownership.
-pub struct LLUnreachable(LLVMValueRef);
+            /// Returns the underlying LLVMValueRef of this value.
+            ///
+            /// # Safety
+            /// - Unsafe because it exposes a raw pointer gotten from LLVM ffi.
+            #[allow(unused)]
+            pub(crate) unsafe fn as_ptr(&self) -> LLVMValueRef {
+                self.0
+            }
+        }
 
-/// A wrapper for LLVM `alloca` instruction.
-///
-/// TODO(appcypher): Add note on safety and ownership.
-pub struct LLAlloca(LLVMValueRef);
+        impl LLValue for $t {
+            unsafe fn value_ref(&self) -> LLVMValueRef {
+                self.0
+            }
+        }
+    };
+}
 
-/// A wrapper for LLVM `ret` instruction.
-///
-/// TODO(appcypher): Add note on safety and ownership.
-pub struct LLRet(LLVMValueRef);
-
-/// A wrapper for LLVM `ret void` instruction.
-///
-/// TODO(appcypher): Add note on safety and ownership.
-pub struct LLRetVoid(LLVMValueRef);
-
-/// A wrapper for LLVM `br` instruction.
-///
-/// TODO(appcypher): Add note on safety and ownership.
-pub struct LLBr(LLVMValueRef);
-
-/// A wrapper for LLVM CondBr instruction.
-///
-/// TODO(appcypher): Add note on safety and ownership.
-pub struct LLCondBr(LLVMValueRef);
+impl_value!(LLParam);
+impl_value!(LLUnreachable);
+impl_value!(LLAlloca);
+impl_value!(LLStore);
+impl_value!(LLLoad);
+impl_value!(LLRet);
+impl_value!(LLRetVoid);
+impl_value!(LLBr);
+impl_value!(LLCondBr);
+impl_value!(LLAdd);
+impl_value!(LLSub);
 
 //------------------------------------------------------------------------------
 // Implementations
@@ -129,32 +133,3 @@ impl LLValue for LLFunction {
         self.0
     }
 }
-
-macro_rules! impl_value {
-    ($t:ty) => {
-        impl $t {
-            pub(super) fn from_ptr(ptr: LLVMValueRef) -> Self {
-                Self(ptr)
-            }
-
-            pub(crate) unsafe fn as_ptr(&self) -> LLVMValueRef {
-                self.0
-            }
-        }
-
-        impl LLValue for $t {
-            unsafe fn value_ref(&self) -> LLVMValueRef {
-                self.0
-            }
-        }
-    };
-}
-
-impl_value!(LLParam);
-impl_value!(LLUnreachable);
-impl_value!(LLAlloca);
-impl_value!(LLStore);
-impl_value!(LLRet);
-impl_value!(LLRetVoid);
-impl_value!(LLBr);
-impl_value!(LLCondBr);

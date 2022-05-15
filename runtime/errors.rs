@@ -5,10 +5,8 @@ pub enum CompilerError {
     UnsupportedTypeSectionEntry(String),
     UnsupportedExportSectionEntry(String),
     UnsupportedImportSectionEntry(String),
-    UnsupportedWasmoValType(String),
     UnsupportedMemory64Proposal,
     UnsupportedSection(String),
-    UnsupportedInstruction(String),
 }
 
 impl std::error::Error for CompilerError {}

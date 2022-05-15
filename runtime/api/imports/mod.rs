@@ -1,3 +1,4 @@
+#![allow(clippy::module_inception)]
 mod imports;
 mod memory;
 mod table;

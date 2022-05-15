@@ -1,4 +1,6 @@
+#![allow(clippy::module_inception)]
 mod compiler;
+mod conversions;
 mod data;
 mod elem;
 mod exports;
@@ -7,7 +9,7 @@ mod global;
 mod imports;
 mod memory;
 mod table;
-mod utils;
+mod generator;
 mod value;
 
 pub use compiler::*;
