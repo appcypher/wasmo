@@ -10,3 +10,12 @@ macro_rules! impl_trait {
         )+
     };
 }
+
+#[macro_export]
+macro_rules! not_null {
+    ($ptr:expr) => {{
+        let ptr = $ptr;
+        assert!(!ptr.is_null(), "Got a null pointer from LLVM");
+        ptr
+    }};
+}

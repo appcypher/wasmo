@@ -7,7 +7,7 @@ use llvm_sys::{
     prelude::LLVMModuleRef,
 };
 
-use crate::{values::LLFunction, types::LLFunctionType};
+use crate::{types::LLFunctionType, values::LLFunction, not_null};
 
 use super::context::LLContext;
 
@@ -48,7 +48,10 @@ impl LLModule {
     ///  - https://llvm.org/doxygen/Module_8cpp_source.html#l00072
     pub(super) fn new(name: &str, context: &LLContext) -> Result<Self> {
         Ok(Self(unsafe {
-            LLVMModuleCreateWithNameInContext(CString::new(name)?.as_ptr(), context.as_ptr())
+            not_null!(LLVMModuleCreateWithNameInContext(
+                CString::new(name)?.as_ptr(),
+                context.as_ptr()
+            ))
         }))
     }
 

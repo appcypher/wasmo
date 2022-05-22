@@ -69,7 +69,7 @@ impl<'a> Generator for FunctionBodyGenerator<'a> {
 
         // Create entry basic block.
         let llvm_context = &self.llvm.context;
-        let llvm_entry_bb = llvm_func.create_basic_block("entry", llvm_context)?;
+        let llvm_entry_bb = llvm_func.create_and_append_basic_block("entry", llvm_context)?;
 
         // Create a builder.
         let mut llvm_builder = llvm_context.create_builder();
@@ -87,6 +87,7 @@ impl<'a> Generator for FunctionBodyGenerator<'a> {
         }
 
         // Then the locals.
+        // TODO(appcypher): Default initialize locals with zero. Need research.
         let mut llvm_locals = Vec::with_capacity(locals_reader.get_count() as usize);
         for local in locals_reader.into_iter() {
             let (index, ref ty) = local?;
@@ -107,7 +108,6 @@ impl<'a> Generator for FunctionBodyGenerator<'a> {
             let operator = operator?;
             let mut operator_generator = OperatorGenerator {
                 operator: &operator,
-                block_count: control_stack.len(),
                 llvm_context,
                 llvm_params: &llvm_params,
                 llvm_locals: &llvm_locals,
@@ -121,9 +121,8 @@ impl<'a> Generator for FunctionBodyGenerator<'a> {
             working_op = Some(operator);
         }
 
-        // Generate return instruction if the last operator was not a return.
-        // NOTE(appcypher): This does not consider the case where return is followed by a series of nops.
-        if !matches!(working_op, Some(Operator::Return)) {
+        // Generate return for the remaining values on the stack.
+        if !value_stack.is_empty() {
             Self::generate_return(&mut llvm_builder, &mut value_stack)
         }
 

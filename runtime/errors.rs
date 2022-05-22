@@ -2,7 +2,6 @@ use std::fmt::Display;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CompilerError {
-    UnsupportedTypeSectionEntry(String),
     UnsupportedExportSectionEntry(String),
     UnsupportedImportSectionEntry(String),
     UnsupportedMemory64Proposal,

@@ -6,7 +6,7 @@ use llvm_sys::{
     prelude::LLVMValueRef,
 };
 
-use crate::{basic_block::LLBasicBlock, context::LLContext, impl_trait, types::LLResultType};
+use crate::{basic_block::LLBasicBlock, context::LLContext, impl_trait, not_null};
 
 use super::{module::LLModule, types::LLFunctionType};
 
@@ -26,7 +26,7 @@ macro_rules! create_value_struct {
 
         impl $ty {
             pub(super) fn from_ptr(ptr: LLVMValueRef) -> Self {
-                Self(ptr)
+                Self($crate::not_null!(ptr))
             }
 
             /// Returns the underlying LLVMValueRef of this value.
@@ -146,14 +146,13 @@ create_value_struct! {
 //------------------------------------------------------------------------------
 
 impl LLFunction {
-    /// Creates a new LLVM Function.
+    /// Creates a new LLVM function.
     ///
     /// This is the only way to create an LLFunction, ensuring it has an associated Module.
     /// Therefore a Module must already exist to dispose it.
     ///
     /// # Safety
     /// - Module can only be created from a Context that frees it.
-    /// - TODO(appcypher): It is unclear if the LLVM depends on `name` pointer.
     ///
     /// ### References
     /// - https://llvm.org/doxygen/Twine_8h_source.html#l00271
@@ -166,17 +165,26 @@ impl LLFunction {
         function_type: &LLFunctionType,
     ) -> Result<Self> {
         Ok(Self(unsafe {
-            LLVMAddFunction(
+            not_null!(LLVMAddFunction(
                 module.as_ptr(),
                 CString::new(name)?.as_ptr(),
                 function_type.as_ptr(),
-            )
+            ))
         }))
     }
 
-    /// Creates a new LLVM Basic Block.
-    pub fn create_basic_block(&self, name: &str, context: &LLContext) -> Result<LLBasicBlock> {
-        LLBasicBlock::new(name, self, context)
+    /// Creates a new LLVM basic block.
+    pub fn create_and_append_basic_block(
+        &self,
+        name: &str,
+        context: &LLContext,
+    ) -> Result<LLBasicBlock> {
+        LLBasicBlock::create_and_append(name, self, context)
+    }
+
+    // Appends a basic block to the end of the function.
+    pub fn append_basic_block(&self, basic_block: &mut LLBasicBlock) {
+        basic_block.append_to_function(self);
     }
 
     /// Gets the param at the given index.

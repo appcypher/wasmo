@@ -15,18 +15,56 @@ use super::{FunctionBodyGenerator, Generator};
 
 /// WebAssembly has three block types for representing control flow.
 pub(crate) enum Control {
+    /// ```text
+    ///    ┌──────────┐
+    /// ┌──┤   Cond   │
+    /// │  └────┬─────┘
+    /// │       │
+    /// │  ┌────▼─────┐
+    /// │  │   Then   ├──┐
+    /// │  └──────────┘  │
+    /// │                │
+    /// │  ┌──────────┐  │
+    /// └──►   Else   │  │
+    ///    └────┬─────┘  │
+    ///         │        │
+    ///    ┌────▼─────┐  │
+    ///    │   End    ◄──┘
+    ///    └──────────┘
+    /// ```
     If {
         then: LLBasicBlock,
-        r#else: Option<LLBasicBlock>,
-        cont: Option<LLBasicBlock>,
+        r#else: LLBasicBlock,
+        end: LLBasicBlock,
     },
+    /// ```text
+    /// ┌─────────┐
+    /// │   Loop  ◄──┐
+    /// └────┬────┘  │
+    ///      │       │
+    ///      ├───────┘
+    ///      │
+    /// ┌────▼────┐
+    /// │   End   │
+    /// └─────────┘
+    /// ```
     Loop {
-        main: LLBasicBlock,
-        cont: Option<LLBasicBlock>,
+        begin: LLBasicBlock,
+        end: LLBasicBlock,
     },
+    /// ```text
+    /// ┌─────────┐
+    /// │  Block  │
+    /// └────┬────┘
+    ///      │
+    ///      │
+    /// ┌────▼────┐
+    /// │  End    │
+    /// └─────────┘
+    /// ```
     Block {
-        main: LLBasicBlock,
-        cont: Option<LLBasicBlock>,
+        begin: LLBasicBlock,
+        end: LLBasicBlock,
     },
 }
 
@@ -40,7 +78,6 @@ pub(crate) struct OperatorGenerator<'a> {
     pub(crate) llvm_func: &'a mut LLFunction,
     pub(crate) control_stack: &'a mut Vec<Control>,
     pub(crate) value_stack: &'a mut Vec<Box<dyn LLValue>>,
-    pub(crate) block_count: usize,
 }
 
 //------------------------------------------------------------------------------
@@ -61,6 +98,7 @@ impl<'a> Generator for OperatorGenerator<'a> {
     type Value = ();
 
     fn generate(&mut self) -> Result<()> {
+        let block_count = self.control_stack.len();
         match self.operator {
             Operator::Unreachable => {
                 self.llvm_builder.build_unreachable();
@@ -74,65 +112,101 @@ impl<'a> Generator for OperatorGenerator<'a> {
 
                 self.llvm_builder.build_add(llvm_zero, llvm_zero, "nop")?;
             }
-            Operator::Block { ty } => {
-                let llvm_bb = self.llvm_func.create_basic_block(
-                    &format!("block_{}", self.block_count),
+            Operator::Block { .. } => {
+                let llvm_begin_bb = self.llvm_func.create_and_append_basic_block(
+                    &format!("block_begin_{}", block_count),
                     self.llvm_context,
                 )?;
+
+                let llvm_end_bb =
+                    LLBasicBlock::new(&format!("block_end_{}", block_count), self.llvm_context)?;
+
+                // Position the builder at the beginning of the begin block.
+                self.llvm_builder.position_at_end(&llvm_begin_bb);
 
                 self.control_stack.push(Control::Block {
-                    main: llvm_bb,
-                    cont: None,
+                    begin: llvm_begin_bb,
+                    end: llvm_end_bb,
                 });
             }
-            Operator::Loop { ty } => {
-                let llvm_bb = self
-                    .llvm_func
-                    .create_basic_block(&format!("loop_{}", self.block_count), self.llvm_context)?;
+            Operator::Loop { .. } => {
+                let llvm_begin_bb = self.llvm_func.create_and_append_basic_block(
+                    &format!("loop_begin_{}", block_count),
+                    self.llvm_context,
+                )?;
+
+                let llvm_end_bb =
+                    LLBasicBlock::new(&format!("loop_end_{}", block_count), self.llvm_context)?;
+
+                // Position the builder at the beginning of the begin block.
+                self.llvm_builder.position_at_end(&llvm_begin_bb);
 
                 self.control_stack.push(Control::Loop {
-                    main: llvm_bb,
-                    cont: None,
+                    begin: llvm_begin_bb,
+                    end: llvm_end_bb,
                 });
             }
-            Operator::If { ty } => {
-                let llvm_then_bb = self.llvm_func.create_basic_block(
-                    &format!("if_then_{}", self.block_count),
+            Operator::If { .. } => {
+                let llvm_then_bb = self.llvm_func.create_and_append_basic_block(
+                    &format!("if_then_{}", block_count),
                     self.llvm_context,
                 )?;
 
-                let llvm_else_bb = self.llvm_func.create_basic_block(
-                    &format!("if_else_{}", self.block_count),
-                    self.llvm_context,
-                )?;
+                let llvm_else_bb =
+                    LLBasicBlock::new(&format!("if_else_{}", block_count), self.llvm_context)?;
 
-                // TODO(appcypher): Complete implementation.
+                let llvm_end_bb =
+                    LLBasicBlock::new(&format!("if_end_{}", block_count), self.llvm_context)?;
 
-                // // Add conditional branching instruction.
-                // let stack_value = value_stack.pop()?;
-                // llvm_builder.build_cond_br(stack_value.as_ref(), &llvm_then_bb, &llvm_else_bb);
+                // Position the builder at the beginning of the then block.
+                self.llvm_builder.position_at_end(&llvm_then_bb);
 
-                // control_stack.push(Block::If {
-                //     then: llvm_then_bb,
-                //     r#else: Some(llvm_else_bb),
-                //     cont: None,
-                // });
+                // Add conditional branching instruction.
+                // let stack_value = self.value_stack.pop().unwrap();
+                // self.llvm_builder
+                //     .build_cond_br(stack_value.as_ref(), &llvm_then_bb, &llvm_else_bb);
+
+                self.control_stack.push(Control::If {
+                    then: llvm_then_bb,
+                    r#else: llvm_else_bb,
+                    end: llvm_end_bb,
+                });
             }
             Operator::Else => {
-                let llvm_cont_bb = self.llvm_func.create_basic_block(
-                    &format!("if_cont_{}", self.block_count),
-                    self.llvm_context,
-                )?;
-
-                if let Control::If { ref mut cont, .. } = self.control_stack.last_mut().unwrap() {
-                    *cont = Some(llvm_cont_bb)
+                let control = self.control_stack.last_mut().unwrap();
+                let llvm_else_bb = match control {
+                    Control::If { r#else, .. } => r#else,
+                    _ => unreachable!(),
                 };
+
+                self.llvm_func.append_basic_block(llvm_else_bb);
+                self.llvm_builder.position_at_end(llvm_else_bb);
             }
             // Operator::Try { ty } => todo!(),
             // Operator::Catch { index } => todo!(),
             // Operator::Throw { index } => todo!(),
             // Operator::Rethrow { relative_depth } => todo!(),
-            // Operator::End => todo!(),
+            Operator::End => {
+                // Position the builder at the beginning of the then block.
+                if let Some(mut control) = self.control_stack.pop() {
+                    match control {
+                        Control::If { ref mut end, .. } => {
+                            self.llvm_func.append_basic_block(end);
+                            self.llvm_builder.position_at_end(end);
+                        }
+                        Control::Loop { ref mut end, .. } => {
+                            self.llvm_func.append_basic_block(end);
+                            self.llvm_builder.position_at_end(end);
+                        }
+                        Control::Block { ref mut end, .. } => {
+                            self.llvm_func.append_basic_block(end);
+                            self.llvm_builder.position_at_end(end);
+                        }
+                    }
+                    // TODO(appcypher): PROBLEM:
+                    // Control -> LLBasicBlock gets freed here.
+                }
+            }
             // Operator::Br { relative_depth } => todo!(),
             // Operator::BrIf { relative_depth } => todo!(),
             // Operator::BrTable { table } => todo!(),
@@ -148,9 +222,9 @@ impl<'a> Generator for OperatorGenerator<'a> {
             // Operator::Drop => todo!(),
             // Operator::Select => todo!(),
             // Operator::TypedSelect { ty } => todo!(),
-            Operator::LocalGet { local_index } => {
-                let llvm_local = self.get_local(*local_index as usize);
-                self.value_stack.push(llvm_local);
+            Operator::LocalGet { .. } => {
+                // let llvm_local = self.get_local(*local_index as usize);
+                // self.value_stack.push(llvm_local);
             }
             // Operator::LocalSet { local_index } => todo!(),
             // Operator::LocalTee { local_index } => todo!(),
@@ -226,22 +300,22 @@ impl<'a> Generator for OperatorGenerator<'a> {
             // Operator::I32Ctz => todo!(),
             // Operator::I32Popcnt => todo!(),
             Operator::I32Add => {
-                let rhs = self.value_stack.pop().unwrap();
-                let lhs = self.value_stack.pop().unwrap();
-                let llvm_result = self
-                    .llvm_builder
-                    .build_add(lhs.as_ref(), rhs.as_ref(), "add")?;
+                // let rhs = self.value_stack.pop().unwrap();
+                // let lhs = self.value_stack.pop().unwrap();
+                // let llvm_result = self
+                //     .llvm_builder
+                //     .build_add(lhs.as_ref(), rhs.as_ref(), "add")?;
 
-                self.value_stack.push(Box::new(llvm_result));
+                // self.value_stack.push(Box::new(llvm_result));
             }
             Operator::I32Sub => {
-                let rhs = self.value_stack.pop().unwrap();
-                let lhs = self.value_stack.pop().unwrap();
-                let llvm_result = self
-                    .llvm_builder
-                    .build_sub(lhs.as_ref(), rhs.as_ref(), "sub")?;
+                // let rhs = self.value_stack.pop().unwrap();
+                // let lhs = self.value_stack.pop().unwrap();
+                // let llvm_result = self
+                //     .llvm_builder
+                //     .build_sub(lhs.as_ref(), rhs.as_ref(), "sub")?;
 
-                self.value_stack.push(Box::new(llvm_result));
+                // self.value_stack.push(Box::new(llvm_result));
             }
             // Operator::I32Mul => todo!(),
             // Operator::I32DivS => todo!(),

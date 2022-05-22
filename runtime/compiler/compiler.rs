@@ -200,11 +200,6 @@ impl Compiler {
                     llvm.info.types.push(llvm_func_ty);
                     self.info.types.push(wasmo_func_ty);
                 }
-                t => {
-                    return Err(
-                        CompilerError::UnsupportedTypeSectionEntry(format!("{:?}", t)).into(),
-                    )
-                }
             };
         }
 

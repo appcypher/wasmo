@@ -8,7 +8,7 @@ use llvm_sys::{
 };
 use upcast::{Upcast, UpcastFrom};
 
-use crate::impl_trait;
+use crate::{impl_trait, not_null};
 
 use super::context::LLContext;
 
@@ -34,7 +34,7 @@ macro_rules! create_type_struct {
         impl $ty {
             pub(super) fn new(context: &LLContext) -> Self {
                 let context_ref = unsafe { context.as_ptr() };
-                Self(unsafe { $llvm_fn(context_ref) })
+                Self(unsafe { $crate::not_null!($llvm_fn(context_ref)) })
             }
 
             /// Returns the underlying LLVMValueRef of this value.
@@ -214,12 +214,12 @@ impl LLFunctionType {
             .collect::<Vec<_>>();
 
         Self(unsafe {
-            LLVMFunctionType(
+            not_null!(LLVMFunctionType(
                 result.result_ref(),
                 params.as_ptr() as *mut LLVMTypeRef,
                 params.len() as u32,
                 is_varargs as i32,
-            )
+            ))
         })
     }
 
