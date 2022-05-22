@@ -6,7 +6,11 @@ use llvm_sys::{
 
 use super::{
     module::LLModule,
-    types::{LLFunctionType, LLNumType, LLNumTypeKind, LLResultType, LLStructType, LLVoidType},
+    types::{LLFunctionType, LLNumType, LLResultType, LLStructType, LLVoidType},
+};
+use crate::{
+    builder::LLBuilder,
+    types::{LLInt128Type, LLInt32Type, LLInt64Type, LLFloat32Type, LLFloat64Type},
 };
 
 /// LLVM Context wrapper.
@@ -30,42 +34,46 @@ impl LLContext {
         LLModule::new(name, self)
     }
 
+    pub fn create_builder(&self) -> LLBuilder {
+        LLBuilder::new(self)
+    }
+
     pub(crate) unsafe fn as_ptr(&self) -> LLVMContextRef {
         self.0
     }
 
-    pub fn i32_type(&self) -> LLNumType {
-        LLNumType::new(self, LLNumTypeKind::I32)
+    pub fn i32_type(&self) -> LLInt32Type {
+        LLInt32Type::new(self)
     }
 
-    pub fn i64_type(&self) -> LLNumType {
-        LLNumType::new(self, LLNumTypeKind::I64)
+    pub fn i64_type(&self) -> LLInt64Type {
+        LLInt64Type::new(self)
     }
 
-    pub fn i128_type(&self) -> LLNumType {
-        LLNumType::new(self, LLNumTypeKind::I128)
+    pub fn i128_type(&self) -> LLInt128Type {
+        LLInt128Type::new(self)
     }
 
-    pub fn f32_type(&self) -> LLNumType {
-        LLNumType::new(self, LLNumTypeKind::F32)
+    pub fn f32_type(&self) -> LLFloat32Type {
+        LLFloat32Type::new(self)
     }
 
-    pub fn f64_type(&self) -> LLNumType {
-        LLNumType::new(self, LLNumTypeKind::F64)
+    pub fn f64_type(&self) -> LLFloat64Type {
+        LLFloat64Type::new(self)
     }
 
     pub fn void_type(&self) -> LLVoidType {
         LLVoidType::new(self)
     }
 
-    pub fn struct_type(&self, types: &[LLNumType], is_packed: bool) -> LLStructType {
+    pub fn struct_type(&self, types: &[Box<dyn LLNumType>], is_packed: bool) -> LLStructType {
         LLStructType::new(types, is_packed)
     }
 
     pub fn function_type(
         &self,
-        params: &[LLNumType],
-        result: &LLResultType,
+        params: &[Box<dyn LLNumType>],
+        result: &dyn LLResultType,
         is_varargs: bool,
     ) -> LLFunctionType {
         LLFunctionType::new(params, result, is_varargs)

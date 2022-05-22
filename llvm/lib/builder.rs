@@ -4,8 +4,8 @@ use anyhow::Result;
 use llvm_sys::{
     core::{
         LLVMBuildAdd, LLVMBuildAlloca, LLVMBuildBr, LLVMBuildCondBr, LLVMBuildLoad, LLVMBuildRet,
-        LLVMBuildRetVoid, LLVMBuildStore, LLVMBuildSub, LLVMBuildUnreachable,
-        LLVMCreateBuilderInContext, LLVMDisposeBuilder, LLVMPositionBuilderAtEnd,
+        LLVMBuildRetVoid, LLVMBuildStore, LLVMBuildSub, LLVMBuildUnreachable, LLVMConstInt,
+        LLVMConstStruct, LLVMCreateBuilderInContext, LLVMDisposeBuilder, LLVMPositionBuilderAtEnd,
     },
     prelude::LLVMBuilderRef,
 };
@@ -13,10 +13,10 @@ use llvm_sys::{
 use crate::{
     basic_block::LLBasicBlock,
     context::LLContext,
-    types::LLNumType,
+    types::{LLIntType, LLNumType},
     values::{
-        LLAdd, LLAlloca, LLBr, LLCondBr, LLLoad, LLRet, LLRetVoid, LLStore, LLSub, LLUnreachable,
-        LLValue,
+        LLAdd, LLAlloca, LLBr, LLCondBr, LLConstInt, LLConstStruct, LLLoad, LLRet, LLRetVoid,
+        LLStore, LLSub, LLUnreachable, LLValue,
     },
 };
 
@@ -28,7 +28,7 @@ pub struct LLBuilder(LLVMBuilderRef);
 
 impl LLBuilder {
     /// Creates a new LLVM IRBuilder.
-    pub fn new(context: &LLContext) -> Self {
+    pub(crate) fn new(context: &LLContext) -> Self {
         Self(unsafe { LLVMCreateBuilderInContext(context.as_ptr()) })
     }
 
@@ -40,9 +40,9 @@ impl LLBuilder {
     }
 
     /// Creates a new LLVM Alloca instruction.
-    pub fn build_alloca(&mut self, ty: &LLNumType, name: &str) -> Result<LLAlloca> {
+    pub fn build_alloca(&mut self, ty: &dyn LLNumType, name: &str) -> Result<LLAlloca> {
         Ok(LLAlloca::from_ptr(unsafe {
-            LLVMBuildAlloca(self.0, ty.as_ptr(), CString::new(name)?.as_ptr())
+            LLVMBuildAlloca(self.0, ty.num_ref(), CString::new(name)?.as_ptr())
         }))
     }
 
@@ -64,7 +64,7 @@ impl LLBuilder {
     }
 
     /// Creates a new LLVM Ret instruction.
-    pub fn build_ret(&mut self, value: &impl LLValue) -> LLRet {
+    pub fn build_ret(&mut self, value: &dyn LLValue) -> LLRet {
         LLRet::from_ptr(unsafe { LLVMBuildRet(self.0, value.value_ref()) })
     }
 
@@ -117,6 +117,31 @@ impl LLBuilder {
                 else_block.as_ptr(),
             )
         })
+    }
+
+    /// Creates a new struct value.
+    pub fn build_struct(&mut self, values: &[Box<dyn LLValue>], packed: bool) -> LLConstStruct {
+        LLConstStruct::from_ptr(unsafe {
+            LLVMConstStruct(
+                values
+                    .iter()
+                    .map(|v| v.value_ref())
+                    .collect::<Vec<_>>()
+                    .as_mut_ptr(),
+                values.len() as u32,
+                packed as i32,
+            )
+        })
+    }
+
+    /// Creates a new LLVM Ret instruction.
+    pub fn build_const_int(
+        &mut self,
+        ty: &dyn LLIntType,
+        value: u64,
+        sign_extended: bool,
+    ) -> LLConstInt {
+        LLConstInt::from_ptr(unsafe { LLVMConstInt(ty.int_ref(), value, sign_extended as i32) })
     }
 
     #[allow(unused)]

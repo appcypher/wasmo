@@ -1,3 +1,4 @@
+use dyn_clone::DynClone;
 use llvm_sys::{
     core::{
         LLVMDoubleTypeInContext, LLVMFloatTypeInContext, LLVMFunctionType, LLVMInt128TypeInContext,
@@ -5,33 +6,124 @@ use llvm_sys::{
     },
     prelude::LLVMTypeRef,
 };
+use upcast::{Upcast, UpcastFrom};
+
+use crate::impl_trait;
 
 use super::context::LLContext;
+
+//------------------------------------------------------------------------------
+// Macros
+//------------------------------------------------------------------------------
+
+macro_rules! create_type_struct {
+    ($ty:ident => $llvm_fn:ident, $doc_title:expr => $doc_ref:expr) => {
+        #[doc = $doc_title]
+        ///
+        /// # Safety
+        /// Only a kind of each `LLVMTypeRef` is ever created. They are singletons and are never freed.
+        ///
+        /// ### References
+        /// - https://llvm.org/doxygen/classllvm_1_1Type.html#details
+        #[doc = ""]
+        #[doc = "# References"]
+        #[doc = $doc_ref]
+        #[derive(Debug, Clone)]
+        pub struct $ty(LLVMTypeRef);
+
+        impl $ty {
+            pub(super) fn new(context: &LLContext) -> Self {
+                let context_ref = unsafe { context.as_ptr() };
+                Self(unsafe { $llvm_fn(context_ref) })
+            }
+
+            /// Returns the underlying LLVMValueRef of this value.
+            ///
+            /// # Safety
+            /// - Unsafe because it exposes a raw pointer gotten from LLVM ffi.
+            #[allow(unused)]
+            pub(crate) unsafe fn as_ptr(&self) -> LLVMTypeRef {
+                self.0
+            }
+        }
+    };
+}
 
 //------------------------------------------------------------------------------
 // Type Definitions
 //------------------------------------------------------------------------------
 
-/// This is based on wasm num and vector types.
-pub enum LLNumTypeKind {
-    I32,
-    I64,
-    I128,
-    F32,
-    F64,
+/// For types that are integers.
+pub trait LLIntType: LLNumType {
+    /// Returns the underlying LLVMTypeRef of this value.
+    ///
+    /// # Safety
+    /// - Unsafe because it exposes a raw pointer gotten from LLVM ffi.
+    unsafe fn int_ref(&self) -> LLVMTypeRef;
 }
 
-/// Wrapper for LLVM number types (e.g. i64, f32) which is based on wasm num and vector types.
+/// For types that are floating points.
+pub trait LLFloatType: LLNumType {
+    /// Returns the underlying LLVMTypeRef of this value.
+    ///
+    /// # Safety
+    /// - Unsafe because it exposes a raw pointer gotten from LLVM ffi.
+    unsafe fn float_ref(&self) -> LLVMTypeRef;
+}
+
+/// For types that are numerical in nature, i.e. integer and floating-point types.
 ///
-/// # Safety
-/// Only a kind of each `LLVMTypeRef` is ever created. They are singletons and are never freed.
+/// Upcast allows us to cast LLNumType to LLResultType.
+pub trait LLNumType: LLResultType + Upcast<dyn LLResultType> {
+    /// Returns the underlying LLVMTypeRef of this value.
+    ///
+    /// # Safety
+    /// - Unsafe because it exposes a raw pointer gotten from LLVM ffi.
+    unsafe fn num_ref(&self) -> LLVMTypeRef;
+}
+
+/// For types that can be returned as a result. This is based on WebAssembly's `Result` type.
 ///
-/// ### References
-/// - https://llvm.org/doxygen/classllvm_1_1Type.html#details
+/// That is number, void and struct types.
 ///
-/// # References
-/// - https://llvm.org/docs/LangRef.html#integer-type
-pub struct LLNumType(LLVMTypeRef);
+/// DynClone helps us clone a &dyn ResultType as Box<dyn ResultType>.
+pub trait LLResultType: DynClone {
+    /// Returns the underlying LLVMTypeRef of this value.
+    ///
+    /// # Safety
+    /// - Unsafe because it exposes a raw pointer gotten from LLVM ffi.
+    unsafe fn result_ref(&self) -> LLVMTypeRef;
+}
+
+create_type_struct! {
+    LLInt32Type => LLVMInt32TypeInContext,
+    "Wrapper for LLVM i32 type" => "https://llvm.org/docs/LangRef.html#integer-type"
+}
+
+create_type_struct! {
+    LLInt64Type => LLVMInt64TypeInContext,
+    "Wrapper for LLVM i64 type" => "https://llvm.org/docs/LangRef.html#integer-type"
+}
+
+create_type_struct! {
+    LLInt128Type =>  LLVMInt128TypeInContext,
+    "Wrapper for LLVM i128 type" => "https://llvm.org/docs/LangRef.html#integer-type"
+}
+
+create_type_struct! {
+    LLFloat32Type => LLVMFloatTypeInContext,
+    "Wrapper for LLVM f32 type" => "https://llvm.org/docs/LangRef.html#floating-point-types"
+}
+
+create_type_struct! {
+    LLFloat64Type => LLVMDoubleTypeInContext,
+    "Wrapper for LLVM f64 type" => "https://llvm.org/docs/LangRef.html#floating-point-types"
+}
+
+create_type_struct! {
+    LLVoidType => LLVMVoidTypeInContext,
+    "Wrapper for LLVM void type" => "https://llvm.org/docs/LangRef.html#void-type"
+}
 
 /// Wrapper for LLVM pointer types (e.g. i64*, [2 x double]*).
 ///
@@ -59,19 +151,11 @@ pub struct LLVectorType(LLVMTypeRef);
 /// - https://llvm.org/docs/LangRef.html#array-type
 pub struct LLArrayType(LLVMTypeRef);
 
-/// Wrapper for LLVM void type.
-///
-/// # Safety
-/// See [`LLNumType`](struct.LLNumType.html)
-///
-/// # References
-/// - https://llvm.org/docs/LangRef.html#void-type
-pub struct LLVoidType(LLVMTypeRef);
-
 /// Wrapper for LLVM struct type.
 ///
 /// # Safety
 /// Same as [`LLFunctionType`](struct.LLFunctionType.html)
+#[derive(Debug, Clone)]
 pub struct LLStructType(LLVMTypeRef);
 
 /// Wrapper for LLVM function type.
@@ -89,66 +173,19 @@ pub struct LLStructType(LLVMTypeRef);
 #[derive(Debug)]
 pub struct LLFunctionType(LLVMTypeRef);
 
-/// A limited variants of types that can be returned by an LLVM function
-pub enum LLResultType {
-    Void(LLVoidType),
-    Num(LLNumType),
-    Struct(LLStructType),
-}
-
 //--------------------------------------------------------------------------------------------------
 // Implementations
 //--------------------------------------------------------------------------------------------------
-
-impl LLNumType {
-    /// Creates an LLVM number type.
-    ///
-    /// # Safety
-    /// LLContext does not own type here.
-    pub fn new(context: &LLContext, kind: LLNumTypeKind) -> Self {
-        use LLNumTypeKind::*;
-        let context_ref = unsafe { context.as_ptr() };
-        let type_ref = unsafe {
-            match kind {
-                I32 => LLVMInt32TypeInContext(context_ref),
-                I64 => LLVMInt64TypeInContext(context_ref),
-                I128 => LLVMInt128TypeInContext(context_ref),
-                F32 => LLVMFloatTypeInContext(context_ref),
-                F64 => LLVMDoubleTypeInContext(context_ref),
-            }
-        };
-
-        Self(type_ref)
-    }
-
-    pub(crate) unsafe fn as_ptr(&self) -> LLVMTypeRef {
-        self.0
-    }
-}
-
-impl LLVoidType {
-    /// Creates an LLVM void type.
-    ///
-    /// # Safety
-    /// See [`LLNumType`](struct.LLNumType.html)
-    pub fn new(context: &LLContext) -> Self {
-        Self(unsafe { LLVMVoidTypeInContext(context.as_ptr()) })
-    }
-
-    pub(crate) unsafe fn as_ptr(&self) -> LLVMTypeRef {
-        self.0
-    }
-}
 
 impl LLStructType {
     /// Creates a new LLVM array type.
     ///
     /// # Safety
     /// See [LLStructType](struct.LLStructType.html) for safety.
-    pub fn new(types: &[LLNumType], is_packed: bool) -> Self {
+    pub fn new(types: &[Box<dyn LLNumType>], is_packed: bool) -> Self {
         let types = types
             .iter()
-            .map(|p| unsafe { p.as_ptr() })
+            .map(|p| unsafe { p.num_ref() })
             .collect::<Vec<_>>();
 
         Self(unsafe {
@@ -170,15 +207,15 @@ impl LLFunctionType {
     ///
     /// # Safety
     /// See [LLFunctionType](struct.LLFunctionType.html) for safety.
-    pub fn new(params: &[LLNumType], result: &LLResultType, is_varargs: bool) -> Self {
+    pub fn new(params: &[Box<dyn LLNumType>], result: &dyn LLResultType, is_varargs: bool) -> Self {
         let params = params
             .iter()
-            .map(|p| unsafe { p.as_ptr() })
+            .map(|p| unsafe { p.num_ref() })
             .collect::<Vec<_>>();
 
         Self(unsafe {
             LLVMFunctionType(
-                result.as_ptr(),
+                result.result_ref(),
                 params.as_ptr() as *mut LLVMTypeRef,
                 params.len() as u32,
                 is_varargs as i32,
@@ -191,13 +228,48 @@ impl LLFunctionType {
     }
 }
 
-impl LLResultType {
-    pub(crate) unsafe fn as_ptr(&self) -> LLVMTypeRef {
-        use LLResultType::*;
-        match self {
-            Void(v) => v.as_ptr(),
-            Num(n) => n.as_ptr(),
-            Struct(s) => s.as_ptr(),
-        }
+impl_trait! {
+    LLIntType(int_ref -> LLVMTypeRef) for {
+        LLInt32Type,
+        LLInt64Type,
+    }
+}
+
+impl_trait! {
+    LLFloatType(float_ref -> LLVMTypeRef) for {
+        LLFloat32Type,
+        LLFloat64Type
+    }
+}
+
+impl_trait! {
+    LLNumType(num_ref -> LLVMTypeRef) for {
+        LLInt32Type,
+        LLInt64Type,
+        LLInt128Type,
+        LLFloat32Type,
+        LLFloat64Type
+    }
+}
+
+impl_trait! {
+    LLResultType(result_ref -> LLVMTypeRef) for {
+        LLInt32Type,
+        LLInt64Type,
+        LLInt128Type,
+        LLFloat32Type,
+        LLFloat64Type,
+        LLVoidType,
+        LLStructType,
+    }
+}
+
+/// The upcast library allows us to cast a trait to a supertrait.
+impl<'a, T: LLResultType + 'a> UpcastFrom<T> for dyn LLResultType + 'a {
+    fn up_from(value: &T) -> &(dyn LLResultType + 'a) {
+        value
+    }
+    fn up_from_mut(value: &mut T) -> &mut (dyn LLResultType + 'a) {
+        value
     }
 }

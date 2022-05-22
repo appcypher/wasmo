@@ -7,7 +7,11 @@ use llvm::{
 };
 use wasmparser::Operator;
 
-use super::Generator;
+use super::{FunctionBodyGenerator, Generator};
+
+//------------------------------------------------------------------------------
+// Type Definitions
+//------------------------------------------------------------------------------
 
 /// WebAssembly has three block types for representing control flow.
 pub(crate) enum Control {
@@ -39,25 +43,36 @@ pub(crate) struct OperatorGenerator<'a> {
     pub(crate) block_count: usize,
 }
 
+//------------------------------------------------------------------------------
+// Implementations
+//------------------------------------------------------------------------------
+
 impl<'a> OperatorGenerator<'a> {
-    pub(crate) fn get_local(&'a self, local_index: usize) -> &'a dyn LLValue {
-        if local_index < self.llvm_locals.len() {
-            &self.llvm_params[local_index]
+    pub(crate) fn get_local(&self, local_index: usize) -> Box<dyn LLValue> {
+        if local_index < self.llvm_params.len() {
+            Box::new(self.llvm_params[local_index].clone())
         } else {
-            &self.llvm_locals[local_index]
+            Box::new(self.llvm_locals[local_index].clone())
         }
     }
 }
 
 impl<'a> Generator for OperatorGenerator<'a> {
+    type Value = ();
+
     fn generate(&mut self) -> Result<()> {
         match self.operator {
             Operator::Unreachable => {
                 self.llvm_builder.build_unreachable();
             }
             Operator::Nop => {
-                // TODO(appcypher): This is a no-op.
-                self.llvm_builder.build_unreachable();
+                // %nop = add i32 0, 0
+                let llvm_zero =
+                    &self
+                        .llvm_builder
+                        .build_const_int(&self.llvm_context.i32_type(), 0, false);
+
+                self.llvm_builder.build_add(llvm_zero, llvm_zero, "nop")?;
             }
             Operator::Block { ty } => {
                 let llvm_bb = self.llvm_func.create_basic_block(
@@ -91,6 +106,8 @@ impl<'a> Generator for OperatorGenerator<'a> {
                     self.llvm_context,
                 )?;
 
+                // TODO(appcypher): Complete implementation.
+
                 // // Add conditional branching instruction.
                 // let stack_value = value_stack.pop()?;
                 // llvm_builder.build_cond_br(stack_value.as_ref(), &llvm_then_bb, &llvm_else_bb);
@@ -119,7 +136,9 @@ impl<'a> Generator for OperatorGenerator<'a> {
             // Operator::Br { relative_depth } => todo!(),
             // Operator::BrIf { relative_depth } => todo!(),
             // Operator::BrTable { table } => todo!(),
-            // Operator::Return => {}
+            Operator::Return => {
+                FunctionBodyGenerator::generate_return(self.llvm_builder, self.value_stack);
+            }
             // Operator::Call { function_index } => todo!(),
             // Operator::CallIndirect { index, table_index } => todo!(),
             // Operator::ReturnCall { function_index } => todo!(),
@@ -130,13 +149,8 @@ impl<'a> Generator for OperatorGenerator<'a> {
             // Operator::Select => todo!(),
             // Operator::TypedSelect { ty } => todo!(),
             Operator::LocalGet { local_index } => {
-                println!("local get index: {:?}", local_index);
                 let llvm_local = self.get_local(*local_index as usize);
-                // TODO(appcypher):
-                //  - Return Rc<dyn LLValue> from get_local (difficult lifetime issues) or
-                //  - Enum? => enum Value { Param(Rc<LLParam>); Local(Rc<LLAlloca>); }
-                //  - value_stack type? => Vec<Rc<?>>
-                // self.value_stack.push(Box::new(llvm_local));
+                self.value_stack.push(llvm_local);
             }
             // Operator::LocalSet { local_index } => todo!(),
             // Operator::LocalTee { local_index } => todo!(),

@@ -8,5 +8,7 @@ use anyhow::Result;
 
 /// Generates LLVM code for a construct.
 pub(crate) trait Generator {
-    fn generate(&mut self) -> Result<()>;
+    type Value;
+
+    fn generate(&mut self) -> Result<Self::Value>;
 }

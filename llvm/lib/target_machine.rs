@@ -1,5 +1,3 @@
 pub struct LLTargetMachine(LLVMTargetMachineRef);
 
-impl TargetMachine {
-    
-}
+impl TargetMachine {}

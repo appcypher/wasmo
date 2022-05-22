@@ -13,7 +13,7 @@ use wasmparser::{
 use super::{
     conversions,
     exports::{Export, Exports},
-    generator::{self, FunctionBodyGenerator, Generator},
+    generator::{FunctionBodyGenerator, Generator},
     imports::{Import, Imports},
     Data, Element, Function, Global, Memory, Table,
 };
@@ -87,53 +87,58 @@ impl Compiler {
 
         // Body index.
         let mut body_index = 0;
-
         for payload in Parser::new(0).parse_all(wasm) {
             match payload? {
-                Payload::Version { .. } => (),
+                Payload::Version {
+                    num,
+                    encoding,
+                    ref range,
+                } => {
+                    validator.version(num, encoding, range)?;
+                }
                 Payload::TypeSection(reader) => {
-                    // validator.type_section(&reader)?;
+                    validator.type_section(&reader)?;
                     self.compile_types(reader, &mut llvm)?;
                 }
                 Payload::ImportSection(reader) => {
-                    // validator.import_section(&reader)?;
+                    validator.import_section(&reader)?;
                     self.compile_imports(reader)?;
                 }
                 Payload::FunctionSection(reader) => {
-                    // validator.function_section(&reader)?;
+                    validator.function_section(&reader)?;
                     self.compile_functions(reader)?;
                 }
                 Payload::TableSection(reader) => {
-                    // validator.table_section(&reader)?;
+                    validator.table_section(&reader)?;
                     self.compile_tables(reader)?;
                 }
                 Payload::MemorySection(reader) => {
-                    // validator.memory_section(&reader)?;
+                    validator.memory_section(&reader)?;
                     self.compile_memories(reader)?;
                 }
                 Payload::GlobalSection(reader) => {
-                    // validator.global_section(&reader)?;
+                    validator.global_section(&reader)?;
                     self.compile_globals(reader)?;
                 }
                 Payload::ExportSection(reader) => {
-                    // validator.export_section(&reader)?;
+                    validator.export_section(&reader)?;
                     self.compile_exports(reader)?;
                 }
                 Payload::StartSection { func, range } => {
-                    // validator.start_section(func, &range)?;
+                    validator.start_section(func, &range)?;
                     self.compile_start_function(func)?;
                 }
                 Payload::ElementSection(reader) => {
-                    // validator.element_section(&reader)?;
+                    validator.element_section(&reader)?;
                     self.compile_elements(reader)?;
                 }
                 Payload::DataCountSection { count, range } => {
-                    // validator.data_count_section(count, &range)?;
+                    validator.data_count_section(count, &range)?;
                     // TODO(appcypher): Implement data section.
                     debug!("data section count: {:?}", count);
                 }
                 Payload::DataSection(reader) => {
-                    // validator.data_section(&reader)?;
+                    validator.data_section(&reader)?;
                     self.compile_data(reader)?;
                 }
                 Payload::CustomSection { name, .. } => {
@@ -141,11 +146,10 @@ impl Compiler {
                     debug!("custom section name: {:?}", name);
                 }
                 Payload::CodeSectionStart { count, range, .. } => {
-                    // validator.code_section_start(count, &range)?;
+                    validator.code_section_start(count, &range)?;
                 }
                 Payload::CodeSectionEntry(body) => {
-                    // validator.code_section_entry(&body)?;
-
+                    validator.code_section_entry(&body)?;
                     let mut body_gen = FunctionBodyGenerator {
                         llvm: &mut llvm,
                         info: &self.info,
@@ -157,11 +161,11 @@ impl Compiler {
                     body_index += 1;
                 }
                 Payload::UnknownSection { id, range, .. } => {
-                    // validator.unknown_section(id, &range)?;
+                    validator.unknown_section(id, &range)?;
                 }
                 Payload::End(_) => (),
                 other => {
-                    // validator.payload(&other)?;
+                    validator.payload(&other)?;
                     return Err(CompilerError::UnsupportedSection(format!("{:?}", other)).into());
                 }
             }
@@ -176,8 +180,6 @@ impl Compiler {
     }
 }
 
-// TODO(appcypher): Make API more composable. For example.
-// let compiler = Compiler::new(&FunctionTranslator::new());
 impl Compiler {
     /// Compiles function types in type section.
     pub(crate) fn compile_types(
@@ -416,10 +418,6 @@ impl Compiler {
     /// Compiles start function.
     pub fn compile_start_function(&mut self, _func: u32) -> Result<()> {
         self.info.start_function = Some(_func);
-        // llvm.codegen_start_function(reader)?;
         Ok(())
     }
 }
-
-#[cfg(test)]
-mod compiler_tests {}

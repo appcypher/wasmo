@@ -133,6 +133,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "dyn-clone"
+version = "1.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21e50f3adc76d6a43f5ed73b698a87d0760ca74617f60f7c3b879003536fdd28"
+
+[[package]]
 name = "env_logger"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -437,6 +443,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ccb82d61f80a663efe1f787a51b16b5a51e3314d6ac365b08639f52387b33f3"
 
 [[package]]
+name = "upcast"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f4a8a88129e2b27efd729ed3f7f79c532946051f6268c6a87e8617c4decf01ce"
+
+[[package]]
 name = "version_check"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -460,7 +472,9 @@ name = "wasmo-llvm"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "dyn-clone",
  "llvm-sys",
+ "upcast",
 ]
 
 [[package]]
@@ -470,6 +484,7 @@ dependencies = [
  "anyhow",
  "bincode",
  "bytecheck",
+ "dyn-clone",
  "env_logger",
  "hashbrown 0.12.0",
  "log",

@@ -13,14 +13,15 @@ use super::{DataKind, ElementKind};
 
 impl From<&wasmparser::Type> for ValType {
     fn from(value: &wasmparser::Type) -> Self {
+        use wasmparser::Type::*;
         match value {
-            wasmparser::Type::I32 => ValType::Num(NumType::I32),
-            wasmparser::Type::I64 => ValType::Num(NumType::I64),
-            wasmparser::Type::F32 => ValType::Num(NumType::F32),
-            wasmparser::Type::F64 => ValType::Num(NumType::F64),
-            wasmparser::Type::V128 => ValType::Vec,
-            wasmparser::Type::FuncRef => ValType::Ref(RefType::FuncRef),
-            wasmparser::Type::ExternRef => ValType::Ref(RefType::ExternRef),
+            I32 => ValType::Num(NumType::I32),
+            I64 => ValType::Num(NumType::I64),
+            F32 => ValType::Num(NumType::F32),
+            F64 => ValType::Num(NumType::F64),
+            V128 => ValType::Vec,
+            FuncRef => ValType::Ref(RefType::FuncRef),
+            ExternRef => ValType::Ref(RefType::ExternRef),
         }
     }
 }
@@ -62,16 +63,20 @@ impl<'a> From<&wasmparser::ElementKind<'a>> for ElementKind {
 //------------------------------------------------------------------------------
 
 /// Converts `wasmparser` `Type` to `LLNumType`.
-pub(crate) fn wasmparser_to_llvm_numtype(ctx: &LLContext, ty: &wasmparser::Type) -> LLNumType {
+pub(crate) fn wasmparser_to_llvm_numtype(
+    ctx: &LLContext,
+    ty: &wasmparser::Type,
+) -> Box<dyn LLNumType> {
+    use wasmparser::Type::*;
     match ty {
-        wasmparser::Type::I32 => ctx.i32_type(),
-        wasmparser::Type::I64 => ctx.i64_type(),
-        wasmparser::Type::F32 => ctx.f32_type(),
-        wasmparser::Type::F64 => ctx.f64_type(),
-        wasmparser::Type::V128 => ctx.i128_type(),
+        I32 => Box::new(ctx.i32_type()),
+        I64 => Box::new(ctx.i64_type()),
+        F32 => Box::new(ctx.f32_type()),
+        F64 => Box::new(ctx.f64_type()),
+        V128 => Box::new(ctx.i128_type()),
         // TODO(appcypher): Use ctx.target_ptr_type() or sth similar.
-        wasmparser::Type::FuncRef => ctx.i64_type(),
-        wasmparser::Type::ExternRef => ctx.i64_type(),
+        FuncRef => Box::new(ctx.i64_type()),
+        ExternRef => Box::new(ctx.i64_type()),
     }
 }
 
@@ -89,20 +94,24 @@ pub(crate) fn wasmparser_to_llvm_functype(
     // If no result type, use a void.
     // If single result type, use a single valtype.
     // If multiple result types, use a tuple of valtypes.
-    let result = match &ty.returns[..] {
-        &[] => LLResultType::Void(ctx.void_type()),
-        &[ref single_ty] => LLResultType::Num(wasmparser_to_llvm_numtype(ctx, single_ty)),
+    let result: Box<dyn LLResultType> = match &ty.returns[..] {
+        &[] => Box::new(ctx.void_type()),
+        &[ref single_ty] => {
+            let num_type = wasmparser_to_llvm_numtype(ctx, single_ty);
+            let result_type: &dyn LLResultType = num_type.as_ref().up();
+            dyn_clone::clone_box(result_type)
+        }
         result_types => {
             let types = result_types
                 .iter()
                 .map(|i| wasmparser_to_llvm_numtype(ctx, i))
                 .collect::<Vec<_>>();
 
-            LLResultType::Struct(ctx.struct_type(&types, true))
+            Box::new(ctx.struct_type(&types, true))
         }
     };
 
-    ctx.function_type(&params, &result, false)
+    ctx.function_type(&params, result.as_ref(), false)
 }
 
 //------------------------------------------------------------------------------
@@ -110,15 +119,15 @@ pub(crate) fn wasmparser_to_llvm_functype(
 //------------------------------------------------------------------------------
 
 /// Converts `wasmparser` `Type` to `LLNumType`.
-pub(crate) fn wasmo_to_llvm_numtype(ctx: &LLContext, ty: &ValType) -> LLNumType {
+pub(crate) fn wasmo_to_llvm_numtype(ctx: &LLContext, ty: &ValType) -> Box<dyn LLNumType> {
     use ValType::*;
     match ty {
-        Num(NumType::I32) => ctx.i32_type(),
-        Num(NumType::I64) => ctx.i64_type(),
-        Num(NumType::F32) => ctx.f32_type(),
-        Num(NumType::F64) => ctx.f64_type(),
+        Num(NumType::I32) => Box::new(ctx.i32_type()),
+        Num(NumType::I64) => Box::new(ctx.i64_type()),
+        Num(NumType::F32) => Box::new(ctx.f32_type()),
+        Num(NumType::F64) => Box::new(ctx.f64_type()),
         // TODO(appcypher): Use ctx.target_ptr_type()
-        Ref(_) => ctx.i64_type(),
-        Vec => ctx.i128_type(),
+        Ref(_) => Box::new(ctx.i64_type()),
+        Vec => Box::new(ctx.i128_type()),
     }
 }
