@@ -2,7 +2,7 @@ use std::pin::Pin;
 
 use super::{context::LLContext, module::LLModule, types::LLFunctionType};
 use anyhow::Result;
-use llvm_sys::core::LLVMShutdown;
+// use llvm_sys::core::LLVMShutdown;
 
 /// Converts WebAssembly semantics to LLVM code and handles materialization.
 ///
@@ -78,6 +78,8 @@ impl LLVM {
 
 impl Drop for LLVM {
     fn drop(&mut self) {
-        unsafe { LLVMShutdown() }
+        // TODO(appcypher): ISSUE:
+        // Results in double free of Context.
+        // unsafe { LLVMShutdown() }
     }
 }

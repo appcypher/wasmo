@@ -1,14 +1,15 @@
 use dyn_clone::DynClone;
 use llvm_sys::{
     core::{
-        LLVMDoubleTypeInContext, LLVMFloatTypeInContext, LLVMFunctionType, LLVMInt128TypeInContext,
-        LLVMInt32TypeInContext, LLVMInt64TypeInContext, LLVMStructType, LLVMVoidTypeInContext,
+        LLVMConstNull, LLVMDoubleTypeInContext, LLVMFloatTypeInContext, LLVMFunctionType,
+        LLVMInt128TypeInContext, LLVMInt32TypeInContext, LLVMInt64TypeInContext, LLVMStructType,
+        LLVMVoidTypeInContext,
     },
     prelude::LLVMTypeRef,
 };
 use upcast::{Upcast, UpcastFrom};
 
-use crate::{impl_trait, not_null};
+use crate::{impl_trait, not_null, values::LLZero};
 
 use super::context::LLContext;
 
@@ -80,6 +81,10 @@ pub trait LLNumType: LLResultType + Upcast<dyn LLResultType> {
     /// # Safety
     /// - Unsafe because it exposes a raw pointer gotten from LLVM ffi.
     unsafe fn num_ref(&self) -> LLVMTypeRef;
+
+    fn zero(&self) -> LLZero {
+        LLZero::from_ptr(unsafe { LLVMConstNull(self.num_ref()) })
+    }
 }
 
 /// For types that can be returned as a result. This is based on WebAssembly's `Result` type.

@@ -3,6 +3,9 @@ use llvm::{
     basic_block::LLBasicBlock,
     builder::LLBuilder,
     context::LLContext,
+    intrinsics,
+    module::LLModule,
+    types::LLNumType,
     values::{LLAlloca, LLFunction, LLParam, LLValue},
 };
 use wasmparser::Operator;
@@ -71,8 +74,8 @@ pub(crate) enum Control {
 /// Generates LLVM IR for an operation.
 pub(crate) struct OperatorGenerator<'a> {
     pub(crate) operator: &'a Operator<'a>,
+    pub(crate) llvm_module: &'a mut LLModule,
     pub(crate) llvm_context: &'a LLContext,
-    pub(crate) llvm_params: &'a Vec<LLParam>,
     pub(crate) llvm_locals: &'a Vec<LLAlloca>,
     pub(crate) llvm_builder: &'a mut LLBuilder,
     pub(crate) llvm_func: &'a mut LLFunction,
@@ -83,16 +86,6 @@ pub(crate) struct OperatorGenerator<'a> {
 //------------------------------------------------------------------------------
 // Implementations
 //------------------------------------------------------------------------------
-
-impl<'a> OperatorGenerator<'a> {
-    pub(crate) fn get_local(&self, local_index: usize) -> Box<dyn LLValue> {
-        if local_index < self.llvm_params.len() {
-            Box::new(self.llvm_params[local_index].clone())
-        } else {
-            Box::new(self.llvm_locals[local_index].clone())
-        }
-    }
-}
 
 impl<'a> Generator for OperatorGenerator<'a> {
     type Value = ();
@@ -105,12 +98,8 @@ impl<'a> Generator for OperatorGenerator<'a> {
             }
             Operator::Nop => {
                 // %nop = add i32 0, 0
-                let llvm_zero =
-                    &self
-                        .llvm_builder
-                        .build_const_int(&self.llvm_context.i32_type(), 0, false);
-
-                self.llvm_builder.build_add(llvm_zero, llvm_zero, "nop")?;
+                let zero = &self.llvm_context.i32_type().zero();
+                self.llvm_builder.build_int_add(zero, zero, "nop")?;
             }
             Operator::Block { .. } => {
                 let llvm_begin_bb = self.llvm_func.create_and_append_basic_block(
@@ -162,9 +151,9 @@ impl<'a> Generator for OperatorGenerator<'a> {
                 self.llvm_builder.position_at_end(&llvm_then_bb);
 
                 // Add conditional branching instruction.
-                // let stack_value = self.value_stack.pop().unwrap();
-                // self.llvm_builder
-                //     .build_cond_br(stack_value.as_ref(), &llvm_then_bb, &llvm_else_bb);
+                let stack_value = self.value_stack.pop().unwrap();
+                self.llvm_builder
+                    .build_cond_br(stack_value.as_ref(), &llvm_then_bb, &llvm_else_bb);
 
                 self.control_stack.push(Control::If {
                     then: llvm_then_bb,
@@ -203,8 +192,6 @@ impl<'a> Generator for OperatorGenerator<'a> {
                             self.llvm_builder.position_at_end(end);
                         }
                     }
-                    // TODO(appcypher): PROBLEM:
-                    // Control -> LLBasicBlock gets freed here.
                 }
             }
             // Operator::Br { relative_depth } => todo!(),
@@ -222,12 +209,22 @@ impl<'a> Generator for OperatorGenerator<'a> {
             // Operator::Drop => todo!(),
             // Operator::Select => todo!(),
             // Operator::TypedSelect { ty } => todo!(),
-            Operator::LocalGet { .. } => {
-                // let llvm_local = self.get_local(*local_index as usize);
-                // self.value_stack.push(llvm_local);
+            Operator::LocalGet { local_index } => {
+                println!("locals {:?}", self.llvm_locals);
+                println!("local_get {}", local_index);
+                let llvm_local = self.llvm_locals[*local_index as usize].clone();
+                self.value_stack.push(Box::new(llvm_local));
             }
-            // Operator::LocalSet { local_index } => todo!(),
-            // Operator::LocalTee { local_index } => todo!(),
+            Operator::LocalSet { local_index } => {
+                let operand = self.value_stack.pop().unwrap();
+                self.llvm_builder
+                    .build_store(&self.llvm_locals[*local_index as usize], operand.as_ref());
+            }
+            Operator::LocalTee { local_index } => {
+                let operand = self.value_stack.last().unwrap();
+                self.llvm_builder
+                    .build_store(&self.llvm_locals[*local_index as usize], operand.as_ref());
+            }
             // Operator::GlobalGet { global_index } => todo!(),
             // Operator::GlobalSet { global_index } => todo!(),
             // Operator::I32Load { memarg } => todo!(),
@@ -296,86 +293,469 @@ impl<'a> Generator for OperatorGenerator<'a> {
             // Operator::F64Gt => todo!(),
             // Operator::F64Le => todo!(),
             // Operator::F64Ge => todo!(),
-            // Operator::I32Clz => todo!(),
-            // Operator::I32Ctz => todo!(),
-            // Operator::I32Popcnt => todo!(),
-            Operator::I32Add => {
-                // let rhs = self.value_stack.pop().unwrap();
-                // let lhs = self.value_stack.pop().unwrap();
-                // let llvm_result = self
-                //     .llvm_builder
-                //     .build_add(lhs.as_ref(), rhs.as_ref(), "add")?;
+            Operator::I32Clz => {
+                let operand = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_call_intrinsic(
+                    &intrinsics::CTLZ_I32,
+                    &[operand.as_ref()],
+                    self.llvm_module,
+                    "clz",
+                )?;
 
-                // self.value_stack.push(Box::new(llvm_result));
+                self.value_stack.push(Box::new(llvm_result));
             }
-            Operator::I32Sub => {
-                // let rhs = self.value_stack.pop().unwrap();
-                // let lhs = self.value_stack.pop().unwrap();
-                // let llvm_result = self
-                //     .llvm_builder
-                //     .build_sub(lhs.as_ref(), rhs.as_ref(), "sub")?;
+            Operator::I32Ctz => {
+                let operand = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_call_intrinsic(
+                    &intrinsics::CTTZ_I32,
+                    &[operand.as_ref()],
+                    self.llvm_module,
+                    "ctz",
+                )?;
 
-                // self.value_stack.push(Box::new(llvm_result));
+                self.value_stack.push(Box::new(llvm_result));
             }
-            // Operator::I32Mul => todo!(),
-            // Operator::I32DivS => todo!(),
-            // Operator::I32DivU => todo!(),
-            // Operator::I32RemS => todo!(),
-            // Operator::I32RemU => todo!(),
-            // Operator::I32And => todo!(),
-            // Operator::I32Or => todo!(),
-            // Operator::I32Xor => todo!(),
-            // Operator::I32Shl => todo!(),
-            // Operator::I32ShrS => todo!(),
-            // Operator::I32ShrU => todo!(),
-            // Operator::I32Rotl => todo!(),
-            // Operator::I32Rotr => todo!(),
-            // Operator::I64Clz => todo!(),
-            // Operator::I64Ctz => todo!(),
-            // Operator::I64Popcnt => todo!(),
-            // Operator::I64Add => todo!(),
-            // Operator::I64Sub => todo!(),
-            // Operator::I64Mul => todo!(),
-            // Operator::I64DivS => todo!(),
-            // Operator::I64DivU => todo!(),
-            // Operator::I64RemS => todo!(),
-            // Operator::I64RemU => todo!(),
-            // Operator::I64And => todo!(),
-            // Operator::I64Or => todo!(),
-            // Operator::I64Xor => todo!(),
-            // Operator::I64Shl => todo!(),
-            // Operator::I64ShrS => todo!(),
-            // Operator::I64ShrU => todo!(),
-            // Operator::I64Rotl => todo!(),
-            // Operator::I64Rotr => todo!(),
-            // Operator::F32Abs => todo!(),
-            // Operator::F32Neg => todo!(),
-            // Operator::F32Ceil => todo!(),
-            // Operator::F32Floor => todo!(),
-            // Operator::F32Trunc => todo!(),
-            // Operator::F32Nearest => todo!(),
-            // Operator::F32Sqrt => todo!(),
-            // Operator::F32Add => todo!(),
-            // Operator::F32Sub => todo!(),
-            // Operator::F32Mul => todo!(),
-            // Operator::F32Div => todo!(),
-            // Operator::F32Min => todo!(),
-            // Operator::F32Max => todo!(),
-            // Operator::F32Copysign => todo!(),
-            // Operator::F64Abs => todo!(),
-            // Operator::F64Neg => todo!(),
-            // Operator::F64Ceil => todo!(),
-            // Operator::F64Floor => todo!(),
-            // Operator::F64Trunc => todo!(),
-            // Operator::F64Nearest => todo!(),
-            // Operator::F64Sqrt => todo!(),
-            // Operator::F64Add => todo!(),
-            // Operator::F64Sub => todo!(),
-            // Operator::F64Mul => todo!(),
-            // Operator::F64Div => todo!(),
-            // Operator::F64Min => todo!(),
-            // Operator::F64Max => todo!(),
-            // Operator::F64Copysign => todo!(),
+            Operator::I32Popcnt => {
+                let operand = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_call_intrinsic(
+                    &intrinsics::CTPOP_I32,
+                    &[operand.as_ref()],
+                    self.llvm_module,
+                    "popcnt",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::I32Add | Operator::I64Add => {
+                let rhs = self.value_stack.pop().unwrap();
+                let lhs = self.value_stack.pop().unwrap();
+                let llvm_result =
+                    self.llvm_builder
+                        .build_int_add(lhs.as_ref(), rhs.as_ref(), "add")?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::I32Sub | Operator::I64Sub => {
+                let rhs = self.value_stack.pop().unwrap();
+                let lhs = self.value_stack.pop().unwrap();
+                let llvm_result =
+                    self.llvm_builder
+                        .build_int_sub(lhs.as_ref(), rhs.as_ref(), "sub")?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::I32Mul | Operator::I64Mul => {
+                let rhs = self.value_stack.pop().unwrap();
+                let lhs = self.value_stack.pop().unwrap();
+                let llvm_result =
+                    self.llvm_builder
+                        .build_int_mul(lhs.as_ref(), rhs.as_ref(), "mul")?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::I32DivS | Operator::I64DivS => {
+                let rhs = self.value_stack.pop().unwrap();
+                let lhs = self.value_stack.pop().unwrap();
+                let llvm_result =
+                    self.llvm_builder
+                        .build_int_sdiv(lhs.as_ref(), rhs.as_ref(), "div_s")?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::I32DivU | Operator::I64DivU => {
+                let rhs = self.value_stack.pop().unwrap();
+                let lhs = self.value_stack.pop().unwrap();
+                let llvm_result =
+                    self.llvm_builder
+                        .build_int_udiv(lhs.as_ref(), rhs.as_ref(), "div_u")?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::I32RemS | Operator::I64RemS => {
+                let rhs = self.value_stack.pop().unwrap();
+                let lhs = self.value_stack.pop().unwrap();
+                let llvm_result =
+                    self.llvm_builder
+                        .build_int_srem(lhs.as_ref(), rhs.as_ref(), "rem_s")?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::I32RemU | Operator::I64RemU => {
+                let rhs = self.value_stack.pop().unwrap();
+                let lhs = self.value_stack.pop().unwrap();
+                let llvm_result =
+                    self.llvm_builder
+                        .build_int_urem(lhs.as_ref(), rhs.as_ref(), "rem_u")?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::I32And | Operator::I64And => {
+                let rhs = self.value_stack.pop().unwrap();
+                let lhs = self.value_stack.pop().unwrap();
+                let llvm_result =
+                    self.llvm_builder
+                        .build_int_and(lhs.as_ref(), rhs.as_ref(), "and")?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::I32Or | Operator::I64Or => {
+                let rhs = self.value_stack.pop().unwrap();
+                let lhs = self.value_stack.pop().unwrap();
+                let llvm_result =
+                    self.llvm_builder
+                        .build_int_or(lhs.as_ref(), rhs.as_ref(), "or")?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::I32Xor | Operator::I64Xor => {
+                let rhs = self.value_stack.pop().unwrap();
+                let lhs = self.value_stack.pop().unwrap();
+                let llvm_result =
+                    self.llvm_builder
+                        .build_int_xor(lhs.as_ref(), rhs.as_ref(), "xor")?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::I32Shl | Operator::I64Shl => {
+                let rhs = self.value_stack.pop().unwrap();
+                let lhs = self.value_stack.pop().unwrap();
+                let llvm_result =
+                    self.llvm_builder
+                        .build_int_shl(lhs.as_ref(), rhs.as_ref(), "shl")?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::I32ShrS | Operator::I64ShrS => {
+                let rhs = self.value_stack.pop().unwrap();
+                let lhs = self.value_stack.pop().unwrap();
+                let llvm_result =
+                    self.llvm_builder
+                        .build_int_ashr(lhs.as_ref(), rhs.as_ref(), "shr_s")?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::I32ShrU | Operator::I64ShrU => {
+                let rhs = self.value_stack.pop().unwrap();
+                let lhs = self.value_stack.pop().unwrap();
+                let llvm_result =
+                    self.llvm_builder
+                        .build_int_lshr(lhs.as_ref(), rhs.as_ref(), "shr_u")?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::I32Rotl | Operator::I64Rotl => {
+                let rhs = self.value_stack.pop().unwrap();
+                let lhs = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_call_intrinsic(
+                    &intrinsics::FSHL_I32,
+                    &[rhs.as_ref(), rhs.as_ref(), lhs.as_ref()],
+                    self.llvm_module,
+                    "rotl",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::I32Rotr | Operator::I64Rotr => {
+                let rhs = self.value_stack.pop().unwrap();
+                let lhs = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_call_intrinsic(
+                    &intrinsics::FSHR_I32,
+                    &[rhs.as_ref(), rhs.as_ref(), lhs.as_ref()],
+                    self.llvm_module,
+                    "rotr",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::I64Clz => {
+                let operand = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_call_intrinsic(
+                    &intrinsics::CTLZ_I64,
+                    &[operand.as_ref()],
+                    self.llvm_module,
+                    "clz",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::I64Ctz => {
+                let operand = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_call_intrinsic(
+                    &intrinsics::CTTZ_I64,
+                    &[operand.as_ref()],
+                    self.llvm_module,
+                    "ctz",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::I64Popcnt => {
+                let operand = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_call_intrinsic(
+                    &intrinsics::CTPOP_I64,
+                    &[operand.as_ref()],
+                    self.llvm_module,
+                    "popcnt",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F32Abs => {
+                let operand = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_call_intrinsic(
+                    &intrinsics::ABS_F32,
+                    &[operand.as_ref()],
+                    self.llvm_module,
+                    "abs",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F32Neg => {
+                let operand = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_call_intrinsic(
+                    &intrinsics::NEG_F32,
+                    &[operand.as_ref()],
+                    self.llvm_module,
+                    "neg",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F32Ceil => {
+                let operand = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_call_intrinsic(
+                    &intrinsics::CEIL_F32,
+                    &[operand.as_ref()],
+                    self.llvm_module,
+                    "ceil",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F32Floor => {
+                let operand = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_call_intrinsic(
+                    &intrinsics::FLOOR_F32,
+                    &[operand.as_ref()],
+                    self.llvm_module,
+                    "floor",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F32Trunc => {
+                let operand = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_call_intrinsic(
+                    &intrinsics::TRUNC_F32,
+                    &[operand.as_ref()],
+                    self.llvm_module,
+                    "trunc",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F32Nearest => {
+                let operand = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_call_intrinsic(
+                    &intrinsics::ROUND_EVEN_F32,
+                    &[operand.as_ref()],
+                    self.llvm_module,
+                    "nearest",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F32Sqrt => {
+                let operand = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_call_intrinsic(
+                    &intrinsics::SQRT_F32,
+                    &[operand.as_ref()],
+                    self.llvm_module,
+                    "sqrt",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F32Add | Operator::F64Add => {
+                let rhs = self.value_stack.pop().unwrap();
+                let lhs = self.value_stack.pop().unwrap();
+                let llvm_result =
+                    self.llvm_builder
+                        .build_float_add(lhs.as_ref(), rhs.as_ref(), "add")?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F32Sub | Operator::F64Sub => {
+                let rhs = self.value_stack.pop().unwrap();
+                let lhs = self.value_stack.pop().unwrap();
+                let llvm_result =
+                    self.llvm_builder
+                        .build_float_sub(lhs.as_ref(), rhs.as_ref(), "sub")?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F32Mul | Operator::F64Mul => {
+                let rhs = self.value_stack.pop().unwrap();
+                let lhs = self.value_stack.pop().unwrap();
+                let llvm_result =
+                    self.llvm_builder
+                        .build_float_mul(lhs.as_ref(), rhs.as_ref(), "mul")?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F32Div | Operator::F64Div => {
+                let rhs = self.value_stack.pop().unwrap();
+                let lhs = self.value_stack.pop().unwrap();
+                let llvm_result =
+                    self.llvm_builder
+                        .build_float_div(lhs.as_ref(), rhs.as_ref(), "div")?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F32Min => {
+                let operand = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_call_intrinsic(
+                    &intrinsics::MINIMUM_F32,
+                    &[operand.as_ref()],
+                    self.llvm_module,
+                    "min",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F32Max => {
+                let operand = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_call_intrinsic(
+                    &intrinsics::MAXIMUM_F32,
+                    &[operand.as_ref()],
+                    self.llvm_module,
+                    "max",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F32Copysign => {
+                let operand = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_call_intrinsic(
+                    &intrinsics::COPYSIGN_F32,
+                    &[operand.as_ref()],
+                    self.llvm_module,
+                    "copysign",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F64Abs => {
+                let operand = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_call_intrinsic(
+                    &intrinsics::ABS_F64,
+                    &[operand.as_ref()],
+                    self.llvm_module,
+                    "abs",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F64Neg => {
+                let operand = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_call_intrinsic(
+                    &intrinsics::NEG_F64,
+                    &[operand.as_ref()],
+                    self.llvm_module,
+                    "neg",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F64Ceil => {
+                let operand = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_call_intrinsic(
+                    &intrinsics::CEIL_F64,
+                    &[operand.as_ref()],
+                    self.llvm_module,
+                    "ceil",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F64Floor => {
+                let operand = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_call_intrinsic(
+                    &intrinsics::FLOOR_F64,
+                    &[operand.as_ref()],
+                    self.llvm_module,
+                    "floor",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F64Trunc => {
+                let operand = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_call_intrinsic(
+                    &intrinsics::TRUNC_F64,
+                    &[operand.as_ref()],
+                    self.llvm_module,
+                    "trunc",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F64Nearest => {
+                let operand = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_call_intrinsic(
+                    &intrinsics::ROUND_EVEN_F64,
+                    &[operand.as_ref()],
+                    self.llvm_module,
+                    "nearest",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F64Sqrt => {
+                let operand = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_call_intrinsic(
+                    &intrinsics::SQRT_F64,
+                    &[operand.as_ref()],
+                    self.llvm_module,
+                    "sqrt",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F64Min => {
+                let operand = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_call_intrinsic(
+                    &intrinsics::MINIMUM_F64,
+                    &[operand.as_ref()],
+                    self.llvm_module,
+                    "min",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F64Max => {
+                let operand = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_call_intrinsic(
+                    &intrinsics::MAXIMUM_F64,
+                    &[operand.as_ref()],
+                    self.llvm_module,
+                    "max",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F64Copysign => {
+                let operand = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_call_intrinsic(
+                    &intrinsics::COPYSIGN_F64,
+                    &[operand.as_ref()],
+                    self.llvm_module,
+                    "copysign",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
             // Operator::I32WrapI64 => todo!(),
             // Operator::I32TruncF32S => todo!(),
             // Operator::I32TruncF32U => todo!(),

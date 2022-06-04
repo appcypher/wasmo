@@ -1,7 +1,7 @@
 use anyhow::Result;
 use llvm::{builder::LLBuilder, values::LLValue, LLVM};
 use log::debug;
-use wasmparser::{FunctionBody, Operator};
+use wasmparser::FunctionBody;
 
 use crate::compiler::{
     conversions,
@@ -80,36 +80,50 @@ impl<'a> Generator for FunctionBodyGenerator<'a> {
         let func_type = &self.info.types[type_index as usize];
 
         // First the params.
-        let mut llvm_params = Vec::with_capacity(func_type.params.len());
-        for (index, _) in func_type.params.iter().enumerate() {
+        let mut llvm_locals =
+            Vec::with_capacity(func_type.params.len() + locals_reader.get_count() as usize);
+
+        println!("llvm_locals_len = {:?}", func_type.params.len() + locals_reader.get_count() as usize);
+
+        for (index, ty) in func_type.params.iter().enumerate() {
             let llvm_param = llvm_func.get_param(index as u32);
-            llvm_params.push(llvm_param);
+            let llvm_local_ty = conversions::wasmo_to_llvm_numtype(llvm_context, ty);
+
+            let llvm_local =
+                llvm_builder.build_alloca(llvm_local_ty.as_ref(), &format!("local_{index}"))?;
+
+            llvm_builder.build_store(&llvm_local, &llvm_param);
+
+            llvm_locals.push(llvm_local);
         }
 
         // Then the locals.
-        // TODO(appcypher): Default initialize locals with zero. Need research.
         let mut llvm_locals = Vec::with_capacity(locals_reader.get_count() as usize);
         for local in locals_reader.into_iter() {
             let (index, ref ty) = local?;
             let llvm_local_ty = conversions::wasmparser_to_llvm_numtype(llvm_context, ty);
+
             let llvm_local =
                 llvm_builder.build_alloca(llvm_local_ty.as_ref(), &format!("local_{index}"))?;
 
+            llvm_builder.build_store(&llvm_local, &llvm_local_ty.zero());
+
             llvm_locals.push(llvm_local);
         }
+
+        println!("llvm_locals = {:?}", llvm_locals);
 
         // The stacks.
         let mut control_stack: Vec<Control> = vec![];
         let mut value_stack: Vec<Box<dyn LLValue>> = vec![];
 
         // Operators.
-        let mut working_op = None;
         for operator in self.body.get_operators_reader()?.into_iter() {
             let operator = operator?;
             let mut operator_generator = OperatorGenerator {
                 operator: &operator,
+                llvm_module,
                 llvm_context,
-                llvm_params: &llvm_params,
                 llvm_locals: &llvm_locals,
                 llvm_builder: &mut llvm_builder,
                 llvm_func: &mut llvm_func,
@@ -118,7 +132,6 @@ impl<'a> Generator for FunctionBodyGenerator<'a> {
             };
 
             operator_generator.generate()?;
-            working_op = Some(operator);
         }
 
         // Generate return for the remaining values on the stack.

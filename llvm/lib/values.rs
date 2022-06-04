@@ -4,6 +4,7 @@ use std::ffi::CString;
 use llvm_sys::{
     core::{LLVMAddFunction, LLVMGetParam},
     prelude::LLVMValueRef,
+    LLVMIntPredicate, LLVMRealPredicate,
 };
 
 use crate::{basic_block::LLBasicBlock, context::LLContext, impl_trait, not_null};
@@ -14,6 +15,7 @@ use super::{module::LLModule, types::LLFunctionType};
 // Macros
 //-----------------------------------------------------------------------------
 
+// TODO(appcypher): Support adding link to instruction like create_type_struct macro.
 macro_rules! create_value_struct {
     ($ty:ident, $doc_title:expr) => {
         #[doc = $doc_title]
@@ -21,6 +23,7 @@ macro_rules! create_value_struct {
         /// - Owned by an LLVM Module.
         ///
         /// https://llvm.org/doxygen/classllvm_1_1Value.html#details
+        // TODO(appcyher): Cloning is not great. Possible Rc in the future.
         #[derive(Debug, Clone)]
         pub struct $ty(LLVMValueRef);
 
@@ -76,6 +79,36 @@ pub trait LLValue {
 #[derive(Debug)]
 pub struct LLFunction(LLVMValueRef);
 
+#[derive(Debug, Clone, Copy)]
+pub enum LLIntPredicate {
+    EQ,
+    NE,
+    UGT,
+    UGE,
+    ULT,
+    ULE,
+    SGT,
+    SGE,
+    SLT,
+    SLE,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum LLFloatPredicate {
+    OEQ,
+    ONE,
+    OGT,
+    OGE,
+    OLT,
+    OLE,
+    UEQ,
+    UNE,
+    UGT,
+    UGE,
+    ULT,
+    ULE,
+}
+
 create_value_struct! {
     LLParam,
     "Wraps the LLVM param value"
@@ -122,13 +155,112 @@ create_value_struct! {
 }
 
 create_value_struct! {
-    LLAdd,
+    LLCall,
+    "Wraps the LLVM call value"
+}
+
+create_value_struct! {
+    LLIntAdd,
     "Wraps the LLVM add value"
 }
 
 create_value_struct! {
-    LLSub,
+    LLIntSub,
     "Wraps the LLVM sub value"
+}
+
+create_value_struct! {
+    LLIntMul,
+    "Wraps the LLVM mul value"
+}
+
+create_value_struct! {
+    LLIntUDiv,
+    "Wraps the LLVM udiv value"
+}
+
+create_value_struct! {
+    LLIntSDiv,
+    "Wraps the LLVM sdiv value"
+}
+
+create_value_struct! {
+    LLIntURem,
+    "Wraps the LLVM urem value"
+}
+
+create_value_struct! {
+    LLIntSRem,
+    "Wraps the LLVM srem value"
+}
+create_value_struct! {
+    LLIntAnd,
+    "Wraps the LLVM and value"
+}
+
+create_value_struct! {
+    LLIntOr,
+    "Wraps the LLVM or value"
+}
+
+create_value_struct! {
+    LLIntXor,
+    "Wraps the LLVM xor value"
+}
+
+create_value_struct! {
+    LLIntShl,
+    "Wraps the LLVM shl value"
+}
+
+create_value_struct! {
+    LLIntLShr,
+    "Wraps the LLVM lshr value"
+}
+
+create_value_struct! {
+    LLIntAShr,
+    "Wraps the LLVM ashr value"
+}
+
+create_value_struct! {
+    LLIntCmp,
+    "Wraps the LLVM icmp [eq|ne|sge|...] value"
+}
+
+create_value_struct! {
+    LLFloatAdd,
+    "Wraps the LLVM fadd value"
+}
+
+create_value_struct! {
+    LLFloatSub,
+    "Wraps the LLVM fsub value"
+}
+
+create_value_struct! {
+    LLFloatMul,
+    "Wraps the LLVM fmul value"
+}
+
+create_value_struct! {
+    LLFloatDiv,
+    "Wraps the LLVM fdiv value"
+}
+
+create_value_struct! {
+    LLFloatRem,
+    "Wraps the LLVM frem value"
+}
+
+create_value_struct! {
+    LLZero,
+    "Wraps the LLVM zero value"
+}
+
+create_value_struct! {
+    LLFloatCmp,
+    "Wraps the LLVM fcmp [ueq|une|uge|...] value"
 }
 
 create_value_struct! {
@@ -173,6 +305,10 @@ impl LLFunction {
         }))
     }
 
+    pub(crate) fn from_ptr(ptr: LLVMValueRef) -> Self {
+        Self(ptr)
+    }
+
     /// Creates a new LLVM basic block.
     pub fn create_and_append_basic_block(
         &self,
@@ -206,12 +342,68 @@ impl_trait! {
         LLStore,
         LLLoad,
         LLRet,
-        LLRetVoid,
         LLBr,
+        LLCall,
         LLCondBr,
-        LLAdd,
-        LLSub,
+        LLIntAdd,
+        LLIntSub,
+        LLIntMul,
+        LLIntUDiv,
+        LLIntSDiv,
+        LLIntURem,
+        LLIntSRem,
+        LLIntAnd,
+        LLIntOr,
+        LLIntXor,
+        LLIntShl,
+        LLIntLShr,
+        LLIntAShr,
+        LLIntCmp,
+        LLFloatAdd,
+        LLFloatSub,
+        LLFloatMul,
+        LLFloatDiv,
+        LLFloatRem,
+        LLFloatCmp,
+        LLZero,
+        LLRetVoid,
         LLConstStruct,
         LLConstInt,
+    }
+}
+
+impl From<LLIntPredicate> for LLVMIntPredicate {
+    fn from(pred: LLIntPredicate) -> Self {
+        match pred {
+            LLIntPredicate::EQ => LLVMIntPredicate::LLVMIntEQ,
+            LLIntPredicate::NE => LLVMIntPredicate::LLVMIntNE,
+            LLIntPredicate::UGT => LLVMIntPredicate::LLVMIntUGT,
+            LLIntPredicate::UGE => LLVMIntPredicate::LLVMIntUGE,
+            LLIntPredicate::ULT => LLVMIntPredicate::LLVMIntULT,
+            LLIntPredicate::ULE => LLVMIntPredicate::LLVMIntULE,
+            LLIntPredicate::SGT => LLVMIntPredicate::LLVMIntSGT,
+            LLIntPredicate::SGE => LLVMIntPredicate::LLVMIntSGE,
+            LLIntPredicate::SLT => LLVMIntPredicate::LLVMIntSLT,
+            LLIntPredicate::SLE => LLVMIntPredicate::LLVMIntSLE,
+        }
+    }
+}
+
+impl From<LLFloatPredicate> for LLVMRealPredicate {
+    fn from(pred: LLFloatPredicate) -> Self {
+        match pred {
+            LLFloatPredicate::OEQ => LLVMRealPredicate::LLVMRealOEQ,
+            LLFloatPredicate::ONE => LLVMRealPredicate::LLVMRealONE,
+            LLFloatPredicate::OGT => LLVMRealPredicate::LLVMRealOGT,
+            LLFloatPredicate::OGE => LLVMRealPredicate::LLVMRealOGE,
+            LLFloatPredicate::OLT => LLVMRealPredicate::LLVMRealOLT,
+            LLFloatPredicate::OLE => LLVMRealPredicate::LLVMRealOLE,
+            LLFloatPredicate::UEQ => LLVMRealPredicate::LLVMRealUEQ,
+            LLFloatPredicate::UNE => LLVMRealPredicate::LLVMRealUNE,
+            LLFloatPredicate::UGT => LLVMRealPredicate::LLVMRealUGT,
+            LLFloatPredicate::UGE => LLVMRealPredicate::LLVMRealUGE,
+            LLFloatPredicate::ULT => LLVMRealPredicate::LLVMRealULT,
+            LLFloatPredicate::ULE => LLVMRealPredicate::LLVMRealULE,
+        }
     }
 }

@@ -3,15 +3,11 @@ use llvm_sys::target_machine::{
     LLVMTargetMachineRef,
 };
 
-use crate::{not_null, string::LLString};
+use crate::string::LLString;
 
 pub struct LLTargetMachine(LLVMTargetMachineRef);
 
 impl LLTargetMachine {
-    pub(crate) fn from_ptr(ptr: LLVMTargetMachineRef) -> Self {
-        Self(not_null!(ptr))
-    }
-
     /// Returns the target triple of the target machine.
     pub fn target_triple(&self) -> String {
         LLString::from_ptr(unsafe { LLVMGetTargetMachineTriple(self.0) }).to_string()

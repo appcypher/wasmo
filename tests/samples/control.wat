@@ -18,29 +18,27 @@
     (local $count i64)
 
     ;; === Body ===
-    (if (i64.gt_s (local.get 0) (local.get 1))
-      (then (return (local.get $result) (i64.const 0) (local.get 0) (local.get 1)))
-    )
+    ;; (if (i64.gt_s (local.get 0) (local.get 1))
+    ;;   (then (return (local.get $result) (i64.const 0) (local.get 0) (local.get 1)))
+    ;; )
 
-    (block
-      (loop
-        (local.set 0 (i64.add (local.get 0) (i64.const 1)))
-        (local.set 1 (i64.sub (local.get 1) (i64.const 1)))
-        (local.set $count (i64.add (local.get $count) (i64.const 1)))
-        (if (i64.ge_s (local.get 0) (local.get 1))
-          (then
-            (local.set $result (local.get 0))
-            (br 2)
-          )
-          (else (br 1))
-        )
-      )
-    )
+    ;; (block
+    ;;   (loop
+    ;;     (local.set 0 (i64.add (local.get 0) (i64.const 1)))
+    ;;     (local.set 1 (i64.sub (local.get 1) (i64.const 1)))
+    ;;     (local.set $count (i64.add (local.get $count) (i64.const 1)))
+    ;;     (if (i64.ge_s (local.get 0) (local.get 1))
+    ;;       (then
+    ;;         (local.set $result (local.get 0))
+    ;;         (br 2)
+    ;;       )
+    ;;       (else (br 1))
+    ;;     )
+    ;;   )
+    ;; )
 
-    (return (local.get $result) (local.get $count) (local.get 0) (local.get 1))
+    ;; (return (local.get $result) (local.get $count) (local.get 0) (local.get 1))
   )
-
-  (func $test)
 
   (export "control" (func $control))
 )

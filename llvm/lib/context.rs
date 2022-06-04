@@ -100,13 +100,11 @@ impl Default for LLContext {
 
 impl Drop for LLContext {
     fn drop(&mut self) {
-        // TODO(appcypher): PROBLEM:
-        // Commenting this out makes the module dump stop hanging but it also leads to dangling pointer.
-        // Elaborate RC and ugly pinning?
-        // Check how inkwell handles this.
-        // Dispose of the LLVM context.
-        // unsafe {
-        //     LLVMContextDispose(self.0);
-        // }
+        // TODO(appcypher): ISSUE:
+        // Disposing leads to a segfault or hang. Looks like LLVMShutdown in the LLVM module double frees it.
+        // Solution: RC and ugly pinning? Also dheck how inkwell handles this.
+        unsafe {
+            LLVMContextDispose(self.0);
+        }
     }
 }

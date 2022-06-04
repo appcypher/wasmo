@@ -10,6 +10,8 @@ So this library relies on the fact that LLVM modules and contexts are not thread
 
 Also based on the ownership information gotten from the docs, we have designed the API to be safe to an extent. For example, a module cannot be created without a context. This is not ideal in some cases but it is the trade-off we have had to make.
 
+Also recently I had to remove Context cleanup code because LLVM keeps segfaulting even when I think it shouldn't so that part is commented out. I need to revisit this problem in the near future and figure out how to fix it.
+
 ## Consideration
 
 There are a lot of self referencing problems and unclear ownership in the LLVM API. We could Rc everything and use pinning for the self referential issues but it doesn't completely solve our problem.

@@ -118,7 +118,7 @@ pub(crate) fn wasmparser_to_llvm_functype(
 // LLVM <-> Wasmo Conversions
 //------------------------------------------------------------------------------
 
-/// Converts `wasmparser` `Type` to `LLNumType`.
+/// Converts `wasmo` `ValType` to `LLNumType`.
 pub(crate) fn wasmo_to_llvm_numtype(ctx: &LLContext, ty: &ValType) -> Box<dyn LLNumType> {
     use ValType::*;
     match ty {

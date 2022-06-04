@@ -6,7 +6,7 @@ pub struct LLJitTargetMachineBuilder(LLVMOrcJITTargetMachineBuilderRef);
 
 impl LLJitTargetMachineBuilder {
     pub fn detect_host(&mut self) -> LLTargetMachine {
-        let opaque_error =
+        let _opaque_error =
             unsafe { LLVMOrcJITTargetMachineBuilderDetectHost(&mut self.0 as *mut _) };
 
         // LLTargetMachine::from_ptr();
