@@ -2,8 +2,8 @@
 
 [workspace]
 members = [
-	'cli',
-	'llvm',
-	'runtime',
-	'tests'
+	'wasmo-cli',
+	'wasmo-llvm',
+	'wasmo-runtime',
+	'wasmo-tests'
 ]

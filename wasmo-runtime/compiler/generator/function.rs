@@ -80,38 +80,35 @@ impl<'a> Generator for FunctionBodyGenerator<'a> {
         let func_type = &self.info.types[type_index as usize];
 
         // First the params.
-        let mut llvm_locals =
-            Vec::with_capacity(func_type.params.len() + locals_reader.get_count() as usize);
-
-        println!("llvm_locals_len = {:?}", func_type.params.len() + locals_reader.get_count() as usize);
-
+        let mut llvm_locals = Vec::new();
         for (index, ty) in func_type.params.iter().enumerate() {
             let llvm_param = llvm_func.get_param(index as u32);
             let llvm_local_ty = conversions::wasmo_to_llvm_numtype(llvm_context, ty);
 
             let llvm_local =
-                llvm_builder.build_alloca(llvm_local_ty.as_ref(), &format!("local_{index}"))?;
+                llvm_builder.build_alloca(llvm_local_ty.as_ref(), &format!("param_{index}"))?;
 
             llvm_builder.build_store(&llvm_local, &llvm_param);
 
             llvm_locals.push(llvm_local);
         }
 
-        // Then the locals.
-        let mut llvm_locals = Vec::with_capacity(locals_reader.get_count() as usize);
+        // Then the locals. Locals are shrunk such that if there consecutive locals with the same type, they are merged.
         for local in locals_reader.into_iter() {
-            let (index, ref ty) = local?;
-            let llvm_local_ty = conversions::wasmparser_to_llvm_numtype(llvm_context, ty);
+            // Each iteration represents a type and the count of consecutive locals with the type.
+            let (count, ref ty) = local?;
 
-            let llvm_local =
-                llvm_builder.build_alloca(llvm_local_ty.as_ref(), &format!("local_{index}"))?;
+            for index in 0..count {
+                let llvm_local_ty = conversions::wasmparser_to_llvm_numtype(llvm_context, ty);
 
-            llvm_builder.build_store(&llvm_local, &llvm_local_ty.zero());
+                let llvm_local =
+                    llvm_builder.build_alloca(llvm_local_ty.as_ref(), &format!("local_{index}"))?;
 
-            llvm_locals.push(llvm_local);
+                llvm_builder.build_store(&llvm_local, &llvm_local_ty.zero());
+
+                llvm_locals.push(llvm_local);
+            }
         }
-
-        println!("llvm_locals = {:?}", llvm_locals);
 
         // The stacks.
         let mut control_stack: Vec<Control> = vec![];

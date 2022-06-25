@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use wasmparser::{
     DataSectionReader, ElementSectionReader, ExportSectionReader, FunctionSectionReader,
     GlobalSectionReader, ImportSectionReader, MemorySectionReader, Parser, Payload,
-    TableSectionReader, TypeDef, TypeRef, TypeSectionReader, Validator,
+    TableSectionReader, Type, TypeRef, TypeSectionReader, Validator,
 };
 
 use super::{
@@ -141,9 +141,9 @@ impl Compiler {
                     validator.data_section(&reader)?;
                     self.compile_data(reader)?;
                 }
-                Payload::CustomSection { name, .. } => {
+                Payload::CustomSection(_) => {
                     // TODO(appcypher): Generate index space mappings to names to be used in codegen. self.compile_name_section()?;
-                    debug!("custom section name: {:?}", name);
+                    debug!("custom section");
                 }
                 Payload::CodeSectionStart { count, range, .. } => {
                     validator.code_section_start(count, &range)?;
@@ -193,7 +193,7 @@ impl Compiler {
             debug!("type: {:?}", typedef);
 
             match &typedef {
-                TypeDef::Func(ty) => {
+                Type::Func(ty) => {
                     let wasmo_func_ty = ty.into();
                     let llvm_func_ty = conversions::wasmparser_to_llvm_functype(&llvm.context, ty);
 

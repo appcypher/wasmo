@@ -11,17 +11,16 @@ use super::{DataKind, ElementKind};
 // Wasmo <-> Wasmparser Conversions
 //------------------------------------------------------------------------------
 
-impl From<&wasmparser::Type> for ValType {
-    fn from(value: &wasmparser::Type) -> Self {
-        use wasmparser::Type::*;
+impl From<&wasmparser::ValType> for ValType {
+    fn from(value: &wasmparser::ValType) -> Self {
         match value {
-            I32 => ValType::Num(NumType::I32),
-            I64 => ValType::Num(NumType::I64),
-            F32 => ValType::Num(NumType::F32),
-            F64 => ValType::Num(NumType::F64),
-            V128 => ValType::Vec,
-            FuncRef => ValType::Ref(RefType::FuncRef),
-            ExternRef => ValType::Ref(RefType::ExternRef),
+            wasmparser::ValType::I32 => ValType::Num(NumType::I32),
+            wasmparser::ValType::I64 => ValType::Num(NumType::I64),
+            wasmparser::ValType::F32 => ValType::Num(NumType::F32),
+            wasmparser::ValType::F64 => ValType::Num(NumType::F64),
+            wasmparser::ValType::V128 => ValType::Vec,
+            wasmparser::ValType::FuncRef => ValType::Ref(RefType::FuncRef),
+            wasmparser::ValType::ExternRef => ValType::Ref(RefType::ExternRef),
         }
     }
 }
@@ -65,18 +64,17 @@ impl<'a> From<&wasmparser::ElementKind<'a>> for ElementKind {
 /// Converts `wasmparser` `Type` to `LLNumType`.
 pub(crate) fn wasmparser_to_llvm_numtype(
     ctx: &LLContext,
-    ty: &wasmparser::Type,
+    ty: &wasmparser::ValType,
 ) -> Box<dyn LLNumType> {
-    use wasmparser::Type::*;
     match ty {
-        I32 => Box::new(ctx.i32_type()),
-        I64 => Box::new(ctx.i64_type()),
-        F32 => Box::new(ctx.f32_type()),
-        F64 => Box::new(ctx.f64_type()),
-        V128 => Box::new(ctx.i128_type()),
+        wasmparser::ValType::I32 => Box::new(ctx.i32_type()),
+        wasmparser::ValType::I64 => Box::new(ctx.i64_type()),
+        wasmparser::ValType::F32 => Box::new(ctx.f32_type()),
+        wasmparser::ValType::F64 => Box::new(ctx.f64_type()),
+        wasmparser::ValType::V128 => Box::new(ctx.i128_type()),
         // TODO(appcypher): Use ctx.target_ptr_type() or sth similar.
-        FuncRef => Box::new(ctx.i64_type()),
-        ExternRef => Box::new(ctx.i64_type()),
+        wasmparser::ValType::FuncRef => Box::new(ctx.i64_type()),
+        wasmparser::ValType::ExternRef => Box::new(ctx.i64_type()),
     }
 }
 

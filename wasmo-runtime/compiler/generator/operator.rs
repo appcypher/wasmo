@@ -210,8 +210,6 @@ impl<'a> Generator for OperatorGenerator<'a> {
             // Operator::Select => todo!(),
             // Operator::TypedSelect { ty } => todo!(),
             Operator::LocalGet { local_index } => {
-                println!("locals {:?}", self.llvm_locals);
-                println!("local_get {}", local_index);
                 let llvm_local = self.llvm_locals[*local_index as usize].clone();
                 self.value_stack.push(Box::new(llvm_local));
             }
