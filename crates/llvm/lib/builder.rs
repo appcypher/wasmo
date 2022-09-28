@@ -5,9 +5,9 @@ use llvm_sys::{
     core::{
         LLVMBuildAShr, LLVMBuildAdd, LLVMBuildAlloca, LLVMBuildAnd, LLVMBuildBr, LLVMBuildCall,
         LLVMBuildCondBr, LLVMBuildFAdd, LLVMBuildFCmp, LLVMBuildFDiv, LLVMBuildFMul, LLVMBuildFRem,
-        LLVMBuildICmp, LLVMBuildLShr, LLVMBuildLoad, LLVMBuildMul, LLVMBuildOr, LLVMBuildRet,
-        LLVMBuildRetVoid, LLVMBuildSDiv, LLVMBuildSRem, LLVMBuildShl, LLVMBuildStore, LLVMBuildSub,
-        LLVMBuildUDiv, LLVMBuildURem, LLVMBuildUnreachable, LLVMBuildXor, LLVMConstInt,
+        LLVMBuildGEP, LLVMBuildICmp, LLVMBuildLShr, LLVMBuildLoad, LLVMBuildMul, LLVMBuildOr,
+        LLVMBuildRet, LLVMBuildRetVoid, LLVMBuildSDiv, LLVMBuildSRem, LLVMBuildShl, LLVMBuildStore,
+        LLVMBuildSub, LLVMBuildUDiv, LLVMBuildURem, LLVMBuildUnreachable, LLVMBuildXor,
         LLVMConstStruct, LLVMCreateBuilderInContext, LLVMDisposeBuilder, LLVMPositionBuilderAtEnd,
     },
     prelude::LLVMBuilderRef,
@@ -19,13 +19,13 @@ use crate::{
     intrinsics::Intrinsic,
     module::LLModule,
     not_null,
-    types::{LLIntType, LLNumType},
+    types::LLValueType,
     values::{
-        LLAlloca, LLBr, LLCall, LLCondBr, LLConstInt, LLConstStruct, LLFloatAdd, LLFloatCmp,
-        LLFloatDiv, LLFloatMul, LLFloatPredicate, LLFloatRem, LLFloatSub, LLFunction, LLIntAShr,
-        LLIntAdd, LLIntCmp, LLIntLShr, LLIntMul, LLIntOr, LLIntPredicate, LLIntSDiv, LLIntSRem,
-        LLIntShl, LLIntSub, LLIntUDiv, LLIntURem, LLIntXor, LLLoad, LLRet, LLRetVoid, LLStore,
-        LLUnreachable, LLValue,
+        LLAlloca, LLBr, LLCall, LLCondBr, LLConstStruct, LLFloatAdd, LLFloatCmp, LLFloatDiv,
+        LLFloatMul, LLFloatPredicate, LLFloatRem, LLFloatSub, LLFunction, LLIntAShr, LLIntAdd,
+        LLIntCmp, LLIntLShr, LLIntMul, LLIntOr, LLIntPredicate, LLIntSDiv, LLIntSRem, LLIntShl,
+        LLIntSub, LLIntUDiv, LLIntURem, LLIntXor, LLLoad, LLRet, LLRetVoid, LLStore, LLUnreachable,
+        LLValue, LLGEP,
     },
 };
 
@@ -49,21 +49,42 @@ impl LLBuilder {
     }
 
     /// Creates a new LLVM alloca instruction.
-    pub fn build_alloca(&mut self, ty: &dyn LLNumType, name: &str) -> Result<LLAlloca> {
+    pub fn build_alloca(&mut self, ty: &dyn LLValueType, name: &str) -> Result<LLAlloca> {
         Ok(LLAlloca::from_ptr(unsafe {
-            LLVMBuildAlloca(self.0, ty.num_ref(), CString::new(name)?.as_ptr())
+            LLVMBuildAlloca(self.0, ty.value_ref(), CString::new(name)?.as_ptr())
         }))
     }
 
     /// Creates a new LLVM store instruction.
-    pub fn build_store(&mut self, alloca: &LLAlloca, value: &dyn LLValue) -> LLStore {
-        LLStore::from_ptr(unsafe { LLVMBuildStore(self.0, alloca.as_ptr(), value.value_ref()) })
+    pub fn build_store(&mut self, value: &dyn LLValue, alloca: &dyn LLValue) -> LLStore {
+        LLStore::from_ptr(unsafe { LLVMBuildStore(self.0, value.value_ref(), alloca.value_ref()) })
     }
 
     /// Creates a new LLVM load instruction.
-    pub fn build_load(&mut self, alloca: &LLAlloca, name: &str) -> Result<LLLoad> {
+    pub fn build_load(&mut self, ptr: &dyn LLValue, name: &str) -> Result<LLLoad> {
         Ok(LLLoad::from_ptr(unsafe {
-            LLVMBuildLoad(self.0, alloca.as_ptr(), CString::new(name)?.as_ptr())
+            LLVMBuildLoad(self.0, ptr.value_ref(), CString::new(name)?.as_ptr())
+        }))
+    }
+
+    pub fn build_gep(
+        &mut self,
+        ptr: &dyn LLValue,
+        indices: &[Box<dyn LLValue>],
+        name: &str,
+    ) -> Result<LLGEP> {
+        Ok(LLGEP::from_ptr(unsafe {
+            LLVMBuildGEP(
+                self.0,
+                ptr.value_ref(),
+                indices
+                    .iter()
+                    .map(|v| v.value_ref())
+                    .collect::<Vec<_>>()
+                    .as_mut_ptr(),
+                indices.len() as u32,
+                CString::new(name)?.as_ptr(),
+            )
         }))
     }
 
@@ -509,16 +530,6 @@ impl LLBuilder {
                 packed as i32,
             )
         })
-    }
-
-    /// Creates a new LLVM const int instruction.
-    pub fn build_const_int(
-        &mut self,
-        ty: &dyn LLIntType,
-        value: u64,
-        sign_extended: bool,
-    ) -> LLConstInt {
-        LLConstInt::from_ptr(unsafe { LLVMConstInt(ty.int_ref(), value, sign_extended as i32) })
     }
 
     #[allow(unused)]

@@ -1,4 +1,8 @@
+use std::fmt::Debug;
+
 use anyhow::Result;
+use llvm::types::{LLFloatType, LLIntType};
+use llvm::values::{LLFloatPredicate, LLIntPredicate};
 use llvm::{
     basic_block::LLBasicBlock,
     builder::LLBuilder,
@@ -6,9 +10,11 @@ use llvm::{
     intrinsics,
     module::LLModule,
     types::LLNumType,
-    values::{LLAlloca, LLFunction, LLParam, LLValue},
+    values::{LLAlloca, LLFunction, LLValue},
 };
 use wasmparser::Operator;
+
+use crate::types::FuncType;
 
 use super::{FunctionBodyGenerator, Generator};
 
@@ -36,7 +42,6 @@ pub(crate) enum Control {
     ///    └──────────┘
     /// ```
     If {
-        then: LLBasicBlock,
         r#else: LLBasicBlock,
         end: LLBasicBlock,
     },
@@ -65,10 +70,7 @@ pub(crate) enum Control {
     /// │  End    │
     /// └─────────┘
     /// ```
-    Block {
-        begin: LLBasicBlock,
-        end: LLBasicBlock,
-    },
+    Block { end: LLBasicBlock },
 }
 
 /// Generates LLVM IR for an operation.
@@ -81,6 +83,7 @@ pub(crate) struct OperatorGenerator<'a> {
     pub(crate) llvm_func: &'a mut LLFunction,
     pub(crate) control_stack: &'a mut Vec<Control>,
     pub(crate) value_stack: &'a mut Vec<Box<dyn LLValue>>,
+    pub(crate) func_type: &'a FuncType,
 }
 
 //------------------------------------------------------------------------------
@@ -98,34 +101,32 @@ impl<'a> Generator for OperatorGenerator<'a> {
             }
             Operator::Nop => {
                 // %nop = add i32 0, 0
-                let zero = &self.llvm_context.i32_type().zero();
-                self.llvm_builder.build_int_add(zero, zero, "nop")?;
+                let llvm_zero = &self.llvm_context.i32_type().zero();
+                self.llvm_builder
+                    .build_int_add(llvm_zero, llvm_zero, "nop")?;
             }
             Operator::Block { .. } => {
                 let llvm_begin_bb = self.llvm_func.create_and_append_basic_block(
-                    &format!("block_begin_{}", block_count),
+                    &format!("block_begin.{}", block_count),
                     self.llvm_context,
                 )?;
 
                 let llvm_end_bb =
-                    LLBasicBlock::new(&format!("block_end_{}", block_count), self.llvm_context)?;
+                    LLBasicBlock::new(&format!("block_end.{}", block_count), self.llvm_context)?;
 
                 // Position the builder at the beginning of the begin block.
                 self.llvm_builder.position_at_end(&llvm_begin_bb);
 
-                self.control_stack.push(Control::Block {
-                    begin: llvm_begin_bb,
-                    end: llvm_end_bb,
-                });
+                self.control_stack.push(Control::Block { end: llvm_end_bb });
             }
             Operator::Loop { .. } => {
                 let llvm_begin_bb = self.llvm_func.create_and_append_basic_block(
-                    &format!("loop_begin_{}", block_count),
+                    &format!("loop_begin.{}", block_count),
                     self.llvm_context,
                 )?;
 
                 let llvm_end_bb =
-                    LLBasicBlock::new(&format!("loop_end_{}", block_count), self.llvm_context)?;
+                    LLBasicBlock::new(&format!("loop_end.{}", block_count), self.llvm_context)?;
 
                 // Position the builder at the beginning of the begin block.
                 self.llvm_builder.position_at_end(&llvm_begin_bb);
@@ -137,38 +138,40 @@ impl<'a> Generator for OperatorGenerator<'a> {
             }
             Operator::If { .. } => {
                 let llvm_then_bb = self.llvm_func.create_and_append_basic_block(
-                    &format!("if_then_{}", block_count),
+                    &format!("if_then.{}", block_count),
                     self.llvm_context,
                 )?;
 
-                let llvm_else_bb =
-                    LLBasicBlock::new(&format!("if_else_{}", block_count), self.llvm_context)?;
+                let llvm_else_bb = self.llvm_func.create_and_append_basic_block(
+                    &format!("if_else.{}", block_count),
+                    self.llvm_context,
+                )?;
 
                 let llvm_end_bb =
-                    LLBasicBlock::new(&format!("if_end_{}", block_count), self.llvm_context)?;
-
-                // Position the builder at the beginning of the then block.
-                self.llvm_builder.position_at_end(&llvm_then_bb);
+                    LLBasicBlock::new(&format!("if_end.{}", block_count), self.llvm_context)?;
 
                 // Add conditional branching instruction.
                 let stack_value = self.value_stack.pop().unwrap();
                 self.llvm_builder
                     .build_cond_br(stack_value.as_ref(), &llvm_then_bb, &llvm_else_bb);
 
+                // Position the builder at the beginning of the then block.
+                self.llvm_builder.position_at_end(&llvm_then_bb);
+
                 self.control_stack.push(Control::If {
-                    then: llvm_then_bb,
                     r#else: llvm_else_bb,
                     end: llvm_end_bb,
                 });
             }
             Operator::Else => {
                 let control = self.control_stack.last_mut().unwrap();
-                let llvm_else_bb = match control {
-                    Control::If { r#else, .. } => r#else,
+                let (llvm_else_bb, llvm_end_bb) = match control {
+                    Control::If { r#else, end, .. } => (r#else, end),
                     _ => unreachable!(),
                 };
 
-                self.llvm_func.append_basic_block(llvm_else_bb);
+                // Just concluded if_then block should break to if_end block.
+                self.llvm_builder.build_br(llvm_end_bb);
                 self.llvm_builder.position_at_end(llvm_else_bb);
             }
             // Operator::Try { ty } => todo!(),
@@ -183,7 +186,13 @@ impl<'a> Generator for OperatorGenerator<'a> {
                             self.llvm_func.append_basic_block(end);
                             self.llvm_builder.position_at_end(end);
                         }
-                        Control::Loop { ref mut end, .. } => {
+                        Control::Loop {
+                            ref begin,
+                            ref mut end,
+                            ..
+                        } => {
+                            // Just concluded begin block should break back to itself
+                            self.llvm_builder.build_br(begin);
                             self.llvm_func.append_basic_block(end);
                             self.llvm_builder.position_at_end(end);
                         }
@@ -194,11 +203,25 @@ impl<'a> Generator for OperatorGenerator<'a> {
                     }
                 }
             }
-            // Operator::Br { relative_depth } => todo!(),
+            Operator::Br { relative_depth } => {
+                let rev_index = self.control_stack.len() - *relative_depth as usize - 1;
+                let llvm_end_bb = match &self.control_stack[rev_index] {
+                    Control::If { end, .. } => end,
+                    Control::Loop { end, .. } => end,
+                    Control::Block { end, .. } => end,
+                };
+
+                self.llvm_builder.build_br(llvm_end_bb);
+            }
             // Operator::BrIf { relative_depth } => todo!(),
             // Operator::BrTable { table } => todo!(),
             Operator::Return => {
-                FunctionBodyGenerator::generate_return(self.llvm_builder, self.value_stack);
+                FunctionBodyGenerator::generate_return(
+                    self.llvm_context,
+                    self.llvm_builder,
+                    self.value_stack,
+                    &self.func_type.results,
+                )?;
             }
             // Operator::Call { function_index } => todo!(),
             // Operator::CallIndirect { index, table_index } => todo!(),
@@ -216,12 +239,13 @@ impl<'a> Generator for OperatorGenerator<'a> {
             Operator::LocalSet { local_index } => {
                 let operand = self.value_stack.pop().unwrap();
                 self.llvm_builder
-                    .build_store(&self.llvm_locals[*local_index as usize], operand.as_ref());
+                    .build_store(operand.as_ref(), &self.llvm_locals[*local_index as usize]);
             }
             Operator::LocalTee { local_index } => {
+                // We don't consume the value on the stack.
                 let operand = self.value_stack.last().unwrap();
                 self.llvm_builder
-                    .build_store(&self.llvm_locals[*local_index as usize], operand.as_ref());
+                    .build_store(operand.as_ref(), &self.llvm_locals[*local_index as usize]);
             }
             // Operator::GlobalGet { global_index } => todo!(),
             // Operator::GlobalSet { global_index } => todo!(),
@@ -250,47 +274,229 @@ impl<'a> Generator for OperatorGenerator<'a> {
             // Operator::I64Store32 { memarg } => todo!(),
             // Operator::MemorySize { mem, mem_byte } => todo!(),
             // Operator::MemoryGrow { mem, mem_byte } => todo!(),
-            // Operator::I32Const { value } => todo!(),
-            // Operator::I64Const { value } => todo!(),
-            // Operator::F32Const { value } => todo!(),
-            // Operator::F64Const { value } => todo!(),
+            Operator::I32Const { value } => {
+                let llvm_const = self.llvm_context.i32_type().constant(*value as u64, false);
+                self.value_stack.push(Box::new(llvm_const));
+            }
+            Operator::I64Const { value } => {
+                let llvm_const = self.llvm_context.i64_type().constant(*value as u64, false);
+                self.value_stack.push(Box::new(llvm_const));
+            }
+            Operator::F32Const { value } => {
+                let llvm_const = self.llvm_context.f32_type().constant(value.bits() as f64);
+                self.value_stack.push(Box::new(llvm_const));
+            }
+            Operator::F64Const { value } => {
+                let llvm_const = self.llvm_context.f64_type().constant(value.bits() as f64);
+                self.value_stack.push(Box::new(llvm_const));
+            }
             // Operator::RefNull { ty } => todo!(),
             // Operator::RefIsNull => todo!(),
             // Operator::RefFunc { function_index } => todo!(),
-            // Operator::I32Eqz => todo!(),
-            // Operator::I32Eq => todo!(),
-            // Operator::I32Ne => todo!(),
-            // Operator::I32LtS => todo!(),
-            // Operator::I32LtU => todo!(),
-            // Operator::I32GtS => todo!(),
-            // Operator::I32GtU => todo!(),
-            // Operator::I32LeS => todo!(),
-            // Operator::I32LeU => todo!(),
-            // Operator::I32GeS => todo!(),
-            // Operator::I32GeU => todo!(),
-            // Operator::I64Eqz => todo!(),
-            // Operator::I64Eq => todo!(),
-            // Operator::I64Ne => todo!(),
-            // Operator::I64LtS => todo!(),
-            // Operator::I64LtU => todo!(),
-            // Operator::I64GtS => todo!(),
-            // Operator::I64GtU => todo!(),
-            // Operator::I64LeS => todo!(),
-            // Operator::I64LeU => todo!(),
-            // Operator::I64GeS => todo!(),
-            // Operator::I64GeU => todo!(),
-            // Operator::F32Eq => todo!(),
-            // Operator::F32Ne => todo!(),
-            // Operator::F32Lt => todo!(),
-            // Operator::F32Gt => todo!(),
-            // Operator::F32Le => todo!(),
-            // Operator::F32Ge => todo!(),
-            // Operator::F64Eq => todo!(),
-            // Operator::F64Ne => todo!(),
-            // Operator::F64Lt => todo!(),
-            // Operator::F64Gt => todo!(),
-            // Operator::F64Le => todo!(),
-            // Operator::F64Ge => todo!(),
+            Operator::I32Eqz | Operator::I64Eqz => {
+                let operand = self.value_stack.pop().unwrap();
+                let llvm_const = self.llvm_context.i32_type().zero();
+                let llvm_result = self.llvm_builder.build_int_cmp(
+                    LLIntPredicate::EQ,
+                    operand.as_ref(),
+                    &llvm_const,
+                    "icmp_eqz",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::I32Eq | Operator::I64Eq => {
+                let operand2 = self.value_stack.pop().unwrap();
+                let operand1 = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_int_cmp(
+                    LLIntPredicate::EQ,
+                    operand1.as_ref(),
+                    operand2.as_ref(),
+                    "icmp_eq",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::I32Ne | Operator::I64Ne => {
+                let operand2 = self.value_stack.pop().unwrap();
+                let operand1 = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_int_cmp(
+                    LLIntPredicate::NE,
+                    operand1.as_ref(),
+                    operand2.as_ref(),
+                    "icmp_ne",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::I32LtS | Operator::I64LtS => {
+                let operand2 = self.value_stack.pop().unwrap();
+                let operand1 = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_int_cmp(
+                    LLIntPredicate::SLT,
+                    operand1.as_ref(),
+                    operand2.as_ref(),
+                    "icmp_lt_s",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::I32LtU | Operator::I64LtU => {
+                let operand2 = self.value_stack.pop().unwrap();
+                let operand1 = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_int_cmp(
+                    LLIntPredicate::ULT,
+                    operand1.as_ref(),
+                    operand2.as_ref(),
+                    "icmp_lt_u",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::I32GtS | Operator::I64GtS => {
+                let operand2 = self.value_stack.pop().unwrap();
+                let operand1 = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_int_cmp(
+                    LLIntPredicate::SGT,
+                    operand1.as_ref(),
+                    operand2.as_ref(),
+                    "icmp_gt_s",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::I32GtU | Operator::I64GtU => {
+                let operand2 = self.value_stack.pop().unwrap();
+                let operand1 = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_int_cmp(
+                    LLIntPredicate::UGT,
+                    operand1.as_ref(),
+                    operand2.as_ref(),
+                    "icmp_gt_u",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::I32LeS | Operator::I64LeS => {
+                let operand2 = self.value_stack.pop().unwrap();
+                let operand1 = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_int_cmp(
+                    LLIntPredicate::SLE,
+                    operand1.as_ref(),
+                    operand2.as_ref(),
+                    "icmp_le_s",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::I32LeU | Operator::I64LeU => {
+                let operand2 = self.value_stack.pop().unwrap();
+                let operand1 = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_int_cmp(
+                    LLIntPredicate::ULE,
+                    operand1.as_ref(),
+                    operand2.as_ref(),
+                    "icmp_le_u",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::I32GeS | Operator::I64GeS => {
+                let operand2 = self.value_stack.pop().unwrap();
+                let operand1 = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_int_cmp(
+                    LLIntPredicate::SGE,
+                    operand1.as_ref(),
+                    operand2.as_ref(),
+                    "icmp_ge_s",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::I32GeU | Operator::I64GeU => {
+                let operand2 = self.value_stack.pop().unwrap();
+                let operand1 = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_int_cmp(
+                    LLIntPredicate::UGE,
+                    operand1.as_ref(),
+                    operand2.as_ref(),
+                    "icmp_ge_u",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F32Eq | Operator::F64Eq => {
+                let operand2 = self.value_stack.pop().unwrap();
+                let operand1 = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_float_cmp(
+                    LLFloatPredicate::OEQ,
+                    operand1.as_ref(),
+                    operand2.as_ref(),
+                    "fcmp_eq",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F32Ne | Operator::F64Ne => {
+                let operand2 = self.value_stack.pop().unwrap();
+                let operand1 = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_float_cmp(
+                    LLFloatPredicate::UNE,
+                    operand1.as_ref(),
+                    operand2.as_ref(),
+                    "fcmp_ne",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F32Lt | Operator::F64Lt => {
+                let operand2 = self.value_stack.pop().unwrap();
+                let operand1 = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_float_cmp(
+                    LLFloatPredicate::OLT,
+                    operand1.as_ref(),
+                    operand2.as_ref(),
+                    "fcmp_lt",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F32Gt | Operator::F64Gt => {
+                let operand2 = self.value_stack.pop().unwrap();
+                let operand1 = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_float_cmp(
+                    LLFloatPredicate::OGT,
+                    operand1.as_ref(),
+                    operand2.as_ref(),
+                    "fcmp_gt",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F32Le | Operator::F64Le => {
+                let operand2 = self.value_stack.pop().unwrap();
+                let operand1 = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_float_cmp(
+                    LLFloatPredicate::OLE,
+                    operand1.as_ref(),
+                    operand2.as_ref(),
+                    "fcmp_le",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
+            Operator::F32Ge | Operator::F64Ge => {
+                let operand2 = self.value_stack.pop().unwrap();
+                let operand1 = self.value_stack.pop().unwrap();
+                let llvm_result = self.llvm_builder.build_float_cmp(
+                    LLFloatPredicate::OGE,
+                    operand1.as_ref(),
+                    operand2.as_ref(),
+                    "fcmp_ge",
+                )?;
+
+                self.value_stack.push(Box::new(llvm_result));
+            }
             Operator::I32Clz => {
                 let operand = self.value_stack.pop().unwrap();
                 let llvm_result = self.llvm_builder.build_call_intrinsic(
@@ -1131,5 +1337,15 @@ impl<'a> Generator for OperatorGenerator<'a> {
         };
 
         Ok(())
+    }
+}
+
+impl Debug for Control {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Control::If { .. } => f.debug_struct("If").finish(),
+            Control::Loop { .. } => f.debug_struct("Loop").finish(),
+            Control::Block { .. } => f.debug_struct("Block").finish(),
+        }
     }
 }

@@ -1,10 +1,11 @@
 use anyhow::Result;
+use dyn_clone::DynClone;
 use std::ffi::CString;
 
 use llvm_sys::{
-    core::{LLVMAddFunction, LLVMGetParam},
+    core::{LLVMAddFunction, LLVMGetParam, LLVMGetTypeKind, LLVMTypeOf},
     prelude::LLVMValueRef,
-    LLVMIntPredicate, LLVMRealPredicate,
+    LLVMIntPredicate, LLVMRealPredicate, LLVMTypeKind,
 };
 
 use crate::{basic_block::LLBasicBlock, context::LLContext, impl_trait, not_null};
@@ -49,12 +50,18 @@ macro_rules! create_value_struct {
 //-----------------------------------------------------------------------------
 
 /// For types that are LLVMValueRef.
-pub trait LLValue {
+pub trait LLValue: DynClone {
     /// Returns the underlying LLVMValueRef of this value.
     ///
     /// # Safety
     /// - Unsafe because it exposes a raw pointer gotten from LLVM ffi.
     unsafe fn value_ref(&self) -> LLVMValueRef;
+
+    fn is_pointer_type(&self) -> bool {
+        unsafe {
+            LLVMTypeKind::LLVMPointerTypeKind == LLVMGetTypeKind(LLVMTypeOf(self.value_ref()))
+        }
+    }
 }
 
 //------------------------------------------------------------------------------
@@ -76,7 +83,7 @@ pub trait LLValue {
 /// - https://llvm.org/doxygen/Function_8cpp_source.html#l00409
 /// - https://llvm.org/doxygen/Function_8cpp_source.html#l00509
 /// - https://llvm.org/doxygen/classllvm_1_1Value.html#details
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LLFunction(LLVMValueRef);
 
 #[derive(Debug, Clone, Copy)]
@@ -132,6 +139,11 @@ create_value_struct! {
 create_value_struct! {
     LLLoad,
     "Wraps the LLVM load value"
+}
+
+create_value_struct! {
+    LLGEP,
+    "Wraps the LLVM getelementptr value"
 }
 
 create_value_struct! {
@@ -273,6 +285,11 @@ create_value_struct! {
     "Wraps the LLVM const int value"
 }
 
+create_value_struct! {
+    LLConstFloat,
+    "Wraps the LLVM const float value"
+}
+
 //------------------------------------------------------------------------------
 // Implementations
 //------------------------------------------------------------------------------
@@ -341,6 +358,7 @@ impl_trait! {
         LLAlloca,
         LLStore,
         LLLoad,
+        LLGEP,
         LLRet,
         LLBr,
         LLCall,
@@ -369,6 +387,7 @@ impl_trait! {
         LLRetVoid,
         LLConstStruct,
         LLConstInt,
+        LLConstFloat,
     }
 }
 

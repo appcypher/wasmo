@@ -14,34 +14,30 @@ use anyhow::Result;
 /// They include:
 ///
 /// #### The Resolvers Functions
-/// - `add_function_resolver(resolver_addr)` // save address to designated data section
-/// - `resolve_imported_memories(store_ref_addr)` // call builtins, save address to designated data section
-/// - `resolve_imported_tables(store_ref_addr)` // call builtins, save address to designated data section
-/// - `resolve_imported_globals(store_ref_addr)` // call builtins, save address to designated data section
-///
-/// #### The Local Setup Functions
-/// - `setup_local_memories(store_ref_addr)` // call builtins, call initializers, save address to designated data section
-/// - `setup_local_tables(store_ref_addr)` // call builtins, call initializers, save address to designated data section
-/// - `setup_local_globals(store_ref_addr)` // call builtins, call initializers, save content to designated data section
+/// - `resolve_functions(store_addr)` // if just-in-time function resolution is disabled. Resolves imported/builtin functions.
+/// - `resolve_memories(store_addr)` // call builtins, save address to designated data section. Resolves imported and local memories.
+/// - `resolve_tables(store_addr)` // ...
+/// - `resolve_globals(store_addr)` // ...
 ///
 /// #### The Initializer Functions
-/// - `initialize_mem_0_data_0(store_ref_addr)` // call builtins, save content to designated data section
+/// - `initialize(store_addr)` // call resolver functions.
+/// - `initialize_mem_0_data_0(store_addr)` // call builtins, save content to designated data section
 /// - ...
 ///
-/// #### The Start Function
-/// - `_start`
+/// #### Other Functions
+/// - `start`
+/// - `function_resolver` // if just-in-time function resolution is enabled.
 ///
 /// #### Materializer Stubs
-/// - calling imported functions
+/// - calling imported/builtin functions
 /// - calling indirect functions
 ///
 /// #### The Store Data Section
-/// - `function_resolver -> func_addr` // resolves builtins and imported functions
 /// - `builtins -> (length, func_addr*)` // builtin function fixup
-/// - `functions -> (length, (type, func_addr)*)` // imported fn fixup and indirect calls
-/// - `memories -> (length, memory_base_addr*)` // memory base address fixup
-/// - `tables -> (length, table_base_addr*)` // table base address fixup
-/// - `globals -> (length, global_addr*)` // global address fixup
+/// - `functions -> (length, ((func_addr, (length, type*))*)` // imported fn fixup and indirect calls
+/// - `memories -> (length, (memory_addr, min, max)*)` // memory base address fixup
+/// - `tables -> (length, (table_addr, min, max)*)` // table base address fixup
+/// - `globals -> (length, (global_addr, mut)*)` // global address fixup
 ///
 /// #### Misc
 /// - loading important values like memory address into registers from the store data section

@@ -331,6 +331,7 @@ impl Compiler {
                 global.ty.mutable,
             ));
 
+            // TODO(appcypher): Implement this.
             // llvm.codegen_global(reader)?;
         }
 
@@ -346,6 +347,7 @@ impl Compiler {
 
             self.info.data.push(Data::new((&data.kind).into()));
 
+            // TODO(appcypher): Implement this.
             // llvm.codegen_data(reader)?;
         }
 
@@ -361,6 +363,7 @@ impl Compiler {
 
             self.info.elements.push(Element::new((&elem.kind).into()));
 
+            // TODO(appcypher): Implement this.
             // llvm.codegen_element(reader)?;
         }
 

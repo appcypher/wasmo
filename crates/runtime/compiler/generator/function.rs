@@ -1,12 +1,21 @@
 use anyhow::Result;
-use llvm::{builder::LLBuilder, values::LLValue, LLVM};
+use llvm::{
+    builder::LLBuilder,
+    context::LLContext,
+    types::{LLIntType, LLNumType},
+    values::LLValue,
+    LLVM,
+};
 use log::debug;
 use wasmparser::FunctionBody;
 
-use crate::compiler::{
-    conversions,
-    generator::{Control, OperatorGenerator},
-    ModuleInfo,
+use crate::{
+    compiler::{
+        conversions,
+        generator::{Control, OperatorGenerator},
+        ModuleInfo,
+    },
+    types::ValType,
 };
 
 use super::Generator;
@@ -29,24 +38,66 @@ pub(crate) struct FunctionBodyGenerator<'a> {
 
 impl<'a> FunctionBodyGenerator<'a> {
     pub(crate) fn generate_return(
-        builder: &mut LLBuilder,
+        llvm_context: &LLContext,
+        llvm_builder: &mut LLBuilder,
         value_stack: &mut Vec<Box<dyn LLValue>>,
-    ) {
+        result_types: &[ValType],
+    ) -> Result<()> {
         match &value_stack[..] {
             &[] => {
-                builder.build_ret_void();
+                llvm_builder.build_ret_void();
             }
             &[ref value] => {
-                builder.build_ret(value.as_ref());
+                // TODO(appcypher): Reuse
+                if value.is_pointer_type() {
+                    let llvm_value = llvm_builder.build_load(value.as_ref(), "result")?;
+                    llvm_builder.build_ret(&llvm_value);
+                } else {
+                    llvm_builder.build_ret(value.as_ref());
+                }
+
+                llvm_builder.build_ret(value.as_ref());
             }
             result_values => {
-                let const_struct = &builder.build_struct(result_values, false);
-                builder.build_ret(const_struct);
+                let result_types = result_types
+                    .iter()
+                    .map(|ty| conversions::wasmo_to_llvm_numtype(llvm_context, ty))
+                    .collect::<Vec<_>>();
+
+                let llvm_struct_ty = llvm_context.struct_type(&result_types, false);
+                let llvm_alloca = llvm_builder.build_alloca(&llvm_struct_ty, "result")?;
+
+                for (index, value) in result_values.iter().enumerate() {
+                    // The GEP.
+                    let zero_index = Box::new(LLNumType::zero(&llvm_context.i32_type()));
+                    let field_index = Box::new(LLIntType::constant(
+                        &llvm_context.i32_type(),
+                        index as u64,
+                        false,
+                    ));
+
+                    let llvm_gep =
+                        llvm_builder.build_gep(&llvm_alloca, &[zero_index, field_index], "gep")?;
+
+                    // The value.
+                    // TODO(appcypher): Reuse
+                    if value.is_pointer_type() {
+                        let llvm_value = llvm_builder.build_load(value.as_ref(), "result")?;
+                        llvm_builder.build_store(&llvm_value, &llvm_gep);
+                    } else {
+                        llvm_builder.build_store(value.as_ref(), &llvm_gep);
+                    }
+                }
+
+                let llvm_load = llvm_builder.build_load(&llvm_alloca, "result_load")?;
+                llvm_builder.build_ret(&llvm_load);
             }
         };
 
         // Exhaust stack
         value_stack.clear();
+
+        Ok(())
     }
 }
 
@@ -86,9 +137,9 @@ impl<'a> Generator for FunctionBodyGenerator<'a> {
             let llvm_local_ty = conversions::wasmo_to_llvm_numtype(llvm_context, ty);
 
             let llvm_local =
-                llvm_builder.build_alloca(llvm_local_ty.as_ref(), &format!("param_{index}"))?;
+                llvm_builder.build_alloca(llvm_local_ty.up(), &format!("param_{index}"))?;
 
-            llvm_builder.build_store(&llvm_local, &llvm_param);
+            llvm_builder.build_store(&llvm_param, &llvm_local);
 
             llvm_locals.push(llvm_local);
         }
@@ -102,9 +153,9 @@ impl<'a> Generator for FunctionBodyGenerator<'a> {
                 let llvm_local_ty = conversions::wasmparser_to_llvm_numtype(llvm_context, ty);
 
                 let llvm_local =
-                    llvm_builder.build_alloca(llvm_local_ty.as_ref(), &format!("local_{index}"))?;
+                    llvm_builder.build_alloca(llvm_local_ty.up(), &format!("local_{index}"))?;
 
-                llvm_builder.build_store(&llvm_local, &llvm_local_ty.zero());
+                llvm_builder.build_store(&llvm_local_ty.zero(), &llvm_local);
 
                 llvm_locals.push(llvm_local);
             }
@@ -126,6 +177,7 @@ impl<'a> Generator for FunctionBodyGenerator<'a> {
                 llvm_func: &mut llvm_func,
                 control_stack: &mut control_stack,
                 value_stack: &mut value_stack,
+                func_type,
             };
 
             operator_generator.generate()?;
@@ -133,7 +185,12 @@ impl<'a> Generator for FunctionBodyGenerator<'a> {
 
         // Generate return for the remaining values on the stack.
         if !value_stack.is_empty() {
-            Self::generate_return(&mut llvm_builder, &mut value_stack)
+            Self::generate_return(
+                llvm_context,
+                &mut llvm_builder,
+                &mut value_stack,
+                &func_type.results,
+            )?;
         }
 
         Ok(())
