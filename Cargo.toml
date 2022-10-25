@@ -2,8 +2,7 @@
 
 [workspace]
 members = [
-	'crates/llvm',
-	'crates/runtime',
+	'llvm',
+	'runtime',
 	'fuzz',
-	'tests'
 ]

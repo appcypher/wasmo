@@ -403,15 +403,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "wasmo-tests"
-version = "0.1.0"
-dependencies = [
- "env_logger",
- "wasmo-runtime",
- "wat",
-]
-
-[[package]]
 name = "wasmparser"
 version = "0.86.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
