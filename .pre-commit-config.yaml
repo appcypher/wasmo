@@ -1,0 +1,47 @@
+repos:
+  - repo: local
+    hooks:
+      - id: fmt
+        name: Cargo Format
+        description: Format Rust project.
+        entry: cargo +nightly fmt
+        language: system
+        types: [rust]
+        args: ["--all", "--", "--check"]
+
+      - id: clippy
+        name: Cargo Clippy
+        description: Check for lint errors and warnings.
+        entry: cargo clippy
+        language: system
+        args: ["--workspace", "--", "-D", "warnings"]
+        types: [rust]
+        pass_filenames: false
+
+  - repo: https://github.com/DevinR528/cargo-sort
+    rev: v1.0.9
+    hooks:
+      - id: cargo-sort
+        args: ["-w"]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.0.1
+    hooks:
+      - id: no-commit-to-branch
+        args: ["-b", "main"]
+
+      - id: check-merge-conflict
+
+      - id: trailing-whitespace
+
+      - id: end-of-file-fixer
+
+      - id: check-yaml
+
+      - id: check-toml
+
+      - id: check-added-large-files
+
+      - id: detect-private-key
+
+      - id: check-executables-have-shebangs
