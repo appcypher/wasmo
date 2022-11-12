@@ -1,0 +1,5 @@
+newline_style = "Unix"
+max_width = 120
+imports_granularity = "Crate"
+normalize_doc_attributes = true
+group_imports = "StdExternalCrate"

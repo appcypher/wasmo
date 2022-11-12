@@ -22,3 +22,11 @@ In this order.
 ### Getting Started
 
 ### Building Project
+
+### Running Examples
+
+Change the `LLVM_SYS_130_PREFIX` variable to point to your LLVM installation.
+
+```bash
+LLVM_SYS_130_PREFIX=/opt/homebrew/opt/llvm cargo run --example module tests/samples/experiment.wat
+```

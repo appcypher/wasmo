@@ -1,6 +1,8 @@
+# TODO(appcypher): Rename members with `wasmo-` prefix
+
 [workspace]
 members = [
-	'cli',
+	'fuzz',
+	'llvm',
 	'runtime',
-	'tests'
 ]
